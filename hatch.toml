@@ -32,6 +32,7 @@ dependencies = [
     "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash @             {root:uri}/../mountainash",
+    "mountainash_files @ {root:uri}",
 ]
 [envs.test.scripts]
 test = "pytest"
