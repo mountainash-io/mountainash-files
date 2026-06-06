@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+
+class FormatError(Exception):
+    """Base for all format detection and parsing errors."""
+
+
+class UnknownFormatError(FormatError):
+    """Format cannot be determined. Carries known_suffixes for remediation."""
+
+    def __init__(self, *, path: str | None, known_suffixes: tuple[str, ...]):
+        self.path = path
+        self.known_suffixes = known_suffixes
+        super().__init__(
+            f"Cannot determine format from path={path!r}. "
+            f"Known suffixes: {', '.join(known_suffixes)}."
+        )
+
+
+class ParseError(FormatError):
+    """A parser failed to parse the input."""
+
+    def __init__(self, format_key: str, message: str):
+        self.format_key = format_key
+        super().__init__(f"[{format_key}] {message}")
+
+
+class FormatConflictError(FormatError):
+    """Registering a format that already exists without override=True."""
