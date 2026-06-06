@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import io
-import typing as t
 from typing import Any, BinaryIO, ClassVar
 
 from mountainash_files.formats._exceptions import ParseError

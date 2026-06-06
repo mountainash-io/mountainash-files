@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import typing as t
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any
 
-from mountainash_files.formats._exceptions import ParseError, UnknownFormatError
 from mountainash_files.formats._registry import (
     get_parser,
     get_spec_class,

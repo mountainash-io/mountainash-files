@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import typing as t
 from typing import Any, ClassVar
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import io
-import typing as t
 from typing import BinaryIO, ClassVar
 
 import pyarrow as pa

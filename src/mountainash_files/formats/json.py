@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import typing as t
-from typing import Any, BinaryIO, ClassVar
+from typing import BinaryIO, ClassVar
 
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
