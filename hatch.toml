@@ -1,0 +1,52 @@
+[metadata]
+allow-direct-references = true
+
+[version]
+path = "src/mountainash_files/__version__.py"
+
+[build.targets.wheel]
+packages = ["src/mountainash_files"]
+
+[envs.default]
+installer = "uv"
+path = ".venv"
+dependencies = [
+    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
+    "mountainash_settings @    {root:uri}/../mountainash-settings",
+]
+
+[[envs.test.matrix]]
+python = ["3.12"]
+
+[envs.test]
+installer = "uv"
+dependencies = [
+    "pytest==8.3.5",
+    "pytest-check==2.5.3",
+    "pytest-mock==3.12.0",
+    "pytest-cov>=4.1.0",
+    "pytest-clarity>=1.0.1",
+    "openpyxl>=3.1",
+    "fastexcel>=0.12",
+    "lxml>=4.9",
+    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
+    "mountainash_settings @    {root:uri}/../mountainash-settings",
+    "mountainash @             {root:uri}/../mountainash",
+]
+[envs.test.scripts]
+test = "pytest"
+cov = "pytest --cov --cov-report=term-missing"
+
+[envs.ruff]
+installer = "uv"
+skip-install = true
+dependencies = ["ruff==0.3.7"]
+[envs.ruff.scripts]
+check = "ruff check ./src"
+fix = "ruff check ./src --fix"
+
+[envs.mypy]
+installer = "uv"
+dependencies = ["mypy==1.10.1"]
+[envs.mypy.scripts]
+check = "mypy --install-types --non-interactive {args:src/mountainash_files tests}"

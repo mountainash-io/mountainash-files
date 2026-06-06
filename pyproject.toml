@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mountainash_files"
+dynamic = ["version"]
+description = "Mountain Ash - Files — Composable file operations with format detection and parsing"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = []
+authors = [
+    { name = "Nathaniel Ramm", email = "nathaniel.ramm@discretedatascience.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+    "pyarrow>=16",
+    "mountainash-utils-files",
+    "mountainash-settings",
+]
+
+[project.optional-dependencies]
+xlsx = ["fastexcel>=0.12"]
+xlsx-compat = ["openpyxl>=3.1"]
+xml = ["lxml>=4.9"]
+all = [
+    "mountainash-files[xlsx]",
+    "mountainash-files[xlsx-compat]",
+    "mountainash-files[xml]",
+]
