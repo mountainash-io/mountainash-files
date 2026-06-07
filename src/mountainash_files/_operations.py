@@ -3,13 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._registry import (
     get_parser,
+    get_serialiser,
     get_spec_class,
     get_suffix_overrides,
     resolve_format,
 )
 from mountainash_files.formats._types import FormatSpec, ParseResult
+from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
 
 
@@ -69,6 +72,79 @@ def _read_bytes(path: str, auth_profile: str | None) -> bytes:
         pass
 
     raise FileNotFoundError(f"File not found: {path}")
+
+
+_APPENDABLE_FORMATS = frozenset({"parquet"})
+
+
+def write(
+    sink: FileSinkSpec,
+    data: Any,
+    *,
+    params: dict[str, Any] | None = None,
+) -> None:
+    """Write data to a destination."""
+    path = sink.path
+    if params:
+        path = path.format(**params)
+
+    # Raw bytes bypass format handling
+    if isinstance(data, bytes):
+        _write_bytes(path, data, sink.auth_profile, sink.create_path)
+        return
+
+    # Resolve format
+    if isinstance(sink.format, FormatSpec):
+        format_key = sink.format.FORMAT
+        spec = sink.format
+    elif isinstance(sink.format, str):
+        format_key, matched_suffix = resolve_format(format=sink.format)
+        overrides = get_suffix_overrides(matched_suffix)
+        spec = get_spec_class(format_key)(**overrides)
+    else:
+        format_key, matched_suffix = resolve_format(path=path)
+        overrides = get_suffix_overrides(matched_suffix)
+        spec = get_spec_class(format_key)(**overrides)
+
+    # Check append support
+    if sink.write_disposition == "append" and format_key not in _APPENDABLE_FORMATS:
+        raise WriteError(
+            f"Format {format_key!r} does not support append. "
+            f"Appendable formats: {', '.join(sorted(_APPENDABLE_FORMATS))}"
+        )
+
+    serialiser = get_serialiser(format_key)
+    if serialiser is None:
+        raise WriteError(f"No serialiser registered for format {format_key!r}")
+
+    serialised = serialiser(data, spec)
+    _write_bytes(path, serialised, sink.auth_profile, sink.create_path)
+
+
+def _write_bytes(
+    path: str,
+    data: bytes,
+    auth_profile: str | None,
+    create_path: bool,
+) -> None:
+    """Write bytes to a path."""
+    p = Path(path)
+    if not _is_remote(path):
+        if create_path:
+            p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+        return
+
+    try:
+        from mountainash_utils_files import StorageFacade
+        facade = StorageFacade.from_path(path)
+        facade.write(path, data)
+    except ImportError:
+        raise WriteError(f"Cannot write to remote path without mountainash-utils-files: {path}")
+
+
+def _is_remote(path: str) -> bool:
+    return "://" in path
 
 
 def _is_not_found(exc: Exception) -> bool:
