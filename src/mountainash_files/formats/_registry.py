@@ -13,6 +13,7 @@ TRANSFORM_SUFFIXES: frozenset[str] = frozenset({
 
 _SPECS: dict[str, type[FormatSpec]] = {}
 _PARSERS: dict[str, t.Callable] = {}
+_SERIALISERS: dict[str, t.Callable | None] = {}
 _SUFFIX_MAP: dict[str, str] = {}
 _SUFFIX_OVERRIDES: dict[str, dict[str, t.Any]] = {}
 
@@ -21,6 +22,7 @@ def _reset_registry() -> None:
     """Clear all registrations. For testing only."""
     _SPECS.clear()
     _PARSERS.clear()
+    _SERIALISERS.clear()
     _SUFFIX_MAP.clear()
     _SUFFIX_OVERRIDES.clear()
 
@@ -29,6 +31,7 @@ def register_format(
     spec_cls: type[FormatSpec],
     parser: t.Callable,
     *,
+    serialiser: t.Callable | None = None,
     suffix_overrides: dict[str, dict[str, t.Any]] | None = None,
     override: bool = False,
 ) -> None:
@@ -46,6 +49,7 @@ def register_format(
 
     _SPECS[key] = spec_cls
     _PARSERS[key] = parser
+    _SERIALISERS[key] = serialiser
     for suffix in spec_cls.SUFFIXES:
         _SUFFIX_MAP[suffix.lower()] = key
     if suffix_overrides:
@@ -85,3 +89,7 @@ def get_parser(format_key: str) -> t.Callable:
 
 def get_spec_class(format_key: str) -> type[FormatSpec]:
     return _SPECS[format_key]
+
+
+def get_serialiser(format_key: str) -> t.Callable | None:
+    return _SERIALISERS.get(format_key)
