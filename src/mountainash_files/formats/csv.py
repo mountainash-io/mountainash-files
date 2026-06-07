@@ -77,4 +77,11 @@ def _resolve_type(dtype_str: str) -> pa.DataType:
     return _TYPE_MAP.get(dtype_str, pa.string())
 
 
-register_format(CsvSpec, csv_parse)
+def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
+    buf = io.BytesIO()
+    write_options = pcsv.WriteOptions(delimiter=spec.delimiter)
+    pcsv.write_csv(data, buf, write_options=write_options)
+    return buf.getvalue()
+
+
+register_format(CsvSpec, csv_parse, serialiser=csv_serialise)

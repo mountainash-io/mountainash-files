@@ -45,4 +45,16 @@ def xml_parse(data: bytes | BinaryIO, spec: XmlSpec) -> Any:
     return root
 
 
-register_format(XmlSpec, xml_parse)
+def xml_serialise(data: Any, spec: XmlSpec) -> bytes:
+    try:
+        from lxml import etree
+        if isinstance(data, etree._Element):
+            return etree.tostring(data, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+    except ImportError:
+        pass
+
+    import xml.etree.ElementTree as ET
+    return ET.tostring(data, encoding="unicode", xml_declaration=True).encode("utf-8")
+
+
+register_format(XmlSpec, xml_parse, serialiser=xml_serialise)

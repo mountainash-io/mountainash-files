@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-import json
+import json as _json
 from typing import BinaryIO, ClassVar
 
 from mountainash_files.formats._exceptions import ParseError
@@ -29,13 +29,13 @@ def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> dict | list:
 
     if spec.ndjson:
         try:
-            return [json.loads(line) for line in raw.splitlines() if line.strip()]
-        except (json.JSONDecodeError, ValueError) as exc:
+            return [_json.loads(line) for line in raw.splitlines() if line.strip()]
+        except (_json.JSONDecodeError, ValueError) as exc:
             raise ParseError("json", str(exc)) from exc
 
     try:
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, ValueError) as exc:
+        parsed = _json.loads(raw)
+    except (_json.JSONDecodeError, ValueError) as exc:
         raise ParseError("json", str(exc)) from exc
 
     if spec.records_path is not None:
@@ -57,8 +57,23 @@ def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> dict | list:
     return parsed
 
 
+import pyarrow as pa  # noqa: E402
+
+
+def json_serialise(data: dict | list | pa.Table, spec: JsonSpec) -> bytes:
+    if isinstance(data, pa.Table):
+        data = data.to_pylist()
+
+    if spec.ndjson and isinstance(data, list):
+        lines = [_json.dumps(item, default=str) for item in data]
+        return ("\n".join(lines) + "\n").encode("utf-8")
+
+    return _json.dumps(data, default=str, indent=2).encode("utf-8")
+
+
 register_format(
     JsonSpec,
     json_parse,
+    serialiser=json_serialise,
     suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
 )

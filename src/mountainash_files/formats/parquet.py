@@ -37,4 +37,10 @@ def parquet_parse(data: bytes | BinaryIO, spec: ParquetSpec) -> pa.Table:
         raise ParseError("parquet", str(exc)) from exc
 
 
-register_format(ParquetSpec, parquet_parse)
+def parquet_serialise(data: pa.Table, spec: ParquetSpec) -> bytes:
+    buf = io.BytesIO()
+    pq.write_table(data, buf)
+    return buf.getvalue()
+
+
+register_format(ParquetSpec, parquet_parse, serialiser=parquet_serialise)
