@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+import io
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from mountainash_utils_files import StorageFacade, read_bytes as _utils_read_bytes
 from mountainash_utils_files.exceptions import PathNotFoundError
@@ -62,11 +65,7 @@ def parse(
 
 
 def _read_bytes(path: str, auth_profile: str | None) -> bytes:
-    """Read bytes from a path. Local paths use pathlib, remote paths use utils-files."""
-    p = Path(path)
-    if p.exists():
-        return p.read_bytes()
-
+    """Read bytes from a path via utils-files (handles local + remote)."""
     return _utils_read_bytes(path)
 
 
@@ -123,20 +122,15 @@ def _write_bytes(
     auth_profile: str | None,
     create_path: bool,
 ) -> None:
-    """Write bytes to a path."""
-    p = Path(path)
-    if not _is_remote(path):
+    """Write bytes to a path via utils-files (handles local + remote)."""
+    if "://" not in path:
+        p = Path(path)
         if create_path:
             p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(data)
-        return
-
+        elif not p.parent.exists():
+            raise WriteError(f"Parent directory does not exist: {p.parent}")
     facade = StorageFacade.from_path(path)
     facade.write(path, data)
-
-
-def _is_remote(path: str) -> bool:
-    return "://" in path
 
 
 def copy(
