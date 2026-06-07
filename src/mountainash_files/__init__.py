@@ -1,7 +1,7 @@
 """mountainash-files: Composable file operations with format detection and parsing."""
 
 from mountainash_files._exceptions import WriteError
-from mountainash_files._operations import parse, write
+from mountainash_files._operations import copy, parse, write
 from mountainash_files.formats._exceptions import (
     FormatConflictError,
     FormatError,
@@ -19,6 +19,7 @@ from mountainash_files.specs.source import FileSourceSpec
 import mountainash_files.formats  # noqa: F401
 
 __all__ = [
+    "copy",
     "parse",
     "write",
     "register_format",

@@ -147,6 +147,29 @@ def _is_remote(path: str) -> bool:
     return "://" in path
 
 
+def copy(
+    source: FileSourceSpec,
+    sink: FileSinkSpec,
+    *,
+    params: dict[str, Any] | None = None,
+) -> None:
+    """Copy bytes from source to destination without parsing."""
+    src_path = source.path
+    dst_path = sink.path
+    if params:
+        src_path = src_path.format(**params)
+        dst_path = dst_path.format(**params)
+
+    try:
+        data = _read_bytes(src_path, source.auth_profile)
+    except (FileNotFoundError, Exception) as exc:
+        if source.on_missing == "skip" and _is_not_found(exc):
+            return
+        raise
+
+    _write_bytes(dst_path, data, sink.auth_profile, sink.create_path)
+
+
 def _is_not_found(exc: Exception) -> bool:
     """Check if an exception represents a file-not-found condition."""
     if isinstance(exc, FileNotFoundError):
