@@ -1,3 +1,5 @@
+import gzip
+import zipfile
 from pathlib import Path
 
 import pyarrow as pa
@@ -35,4 +37,19 @@ def create_xlsx_fixture():
             wb.save(path)
         except ImportError:
             pytest.skip("openpyxl required to create XLSX fixture")
+    yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def create_archive_fixtures():
+    csv_data = (FIXTURES / "sample.csv").read_bytes()
+    gz_path = FIXTURES / "sample.csv.gz"
+    if not gz_path.exists():
+        gz_path.write_bytes(gzip.compress(csv_data))
+
+    zip_path = FIXTURES / "sample.zip"
+    if not zip_path.exists():
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("data/sample.csv", csv_data)
+            zf.writestr("data/readme.txt", b"test readme")
     yield
