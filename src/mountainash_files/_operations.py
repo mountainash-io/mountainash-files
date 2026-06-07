@@ -8,6 +8,7 @@ from typing import Any, BinaryIO
 
 from mountainash_utils_files import StorageFacade
 from mountainash_utils_files.exceptions import PathNotFoundError
+from mountainash_utils_files.settings import load_storage
 from mountainash_utils_files.storage_transforms import Pipeline
 
 from mountainash_files._exceptions import WriteError
@@ -23,10 +24,16 @@ from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
 
 
+def _resolve_auth(auth_profile: str | None) -> tuple:
+    """Resolve an auth_profile name to materialised (profile, auth) instances."""
+    if auth_profile is None:
+        return None, None
+    return load_storage(auth_profile)
+
+
 def _make_facade(path: str, auth_profile: str | None) -> StorageFacade:
-    # TODO: resolve auth_profile string → auth_params once
-    # mountainash-utils-files re-adds profile resolution.
-    return StorageFacade.from_path(path)
+    profile, auth = _resolve_auth(auth_profile)
+    return StorageFacade.from_path(path, profile=profile, auth=auth)
 
 
 def _read_bytes(
