@@ -88,6 +88,24 @@ def parse(
     if params:
         path = path.format(**params)
 
+    # Glob resolution
+    if source.glob is not None:
+        from mountainash_files._glob import resolve_glob
+
+        paths = resolve_glob(path, source.glob, auth_profile=source.auth_profile)
+        results = []
+        for file_path in paths:
+            child_source = FileSourceSpec(
+                path=file_path,
+                format=source.format,
+                auth_profile=source.auth_profile,
+                archive=source.archive,
+                transforms=source.transforms,
+                on_missing=source.on_missing,
+            )
+            results.extend(parse(child_source))
+        return results
+
     # Archive path: read raw bytes (no suffix inference — archive handles decompression),
     # then extract members, then parse each.
     if source.archive is not None:
