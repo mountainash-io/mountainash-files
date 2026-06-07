@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mountainash_utils_files import StorageFacade, read_bytes as _utils_read_bytes
+from mountainash_utils_files.exceptions import PathNotFoundError
+
 from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._registry import (
     get_parser,
@@ -59,19 +62,12 @@ def parse(
 
 
 def _read_bytes(path: str, auth_profile: str | None) -> bytes:
-    """Read bytes from a path. Uses utils-files for remote paths, direct read for local."""
+    """Read bytes from a path. Local paths use pathlib, remote paths use utils-files."""
     p = Path(path)
     if p.exists():
         return p.read_bytes()
 
-    # Try utils-files for remote paths
-    try:
-        from mountainash_utils_files import read_bytes
-        return read_bytes(path)
-    except ImportError:
-        pass
-
-    raise FileNotFoundError(f"File not found: {path}")
+    return _utils_read_bytes(path)
 
 
 _APPENDABLE_FORMATS = frozenset({"parquet"})
@@ -135,12 +131,8 @@ def _write_bytes(
         p.write_bytes(data)
         return
 
-    try:
-        from mountainash_utils_files import StorageFacade
-        facade = StorageFacade.from_path(path)
-        facade.write(path, data)
-    except ImportError:
-        raise WriteError(f"Cannot write to remote path without mountainash-utils-files: {path}")
+    facade = StorageFacade.from_path(path)
+    facade.write(path, data)
 
 
 def _is_remote(path: str) -> bool:
@@ -172,10 +164,4 @@ def copy(
 
 def _is_not_found(exc: Exception) -> bool:
     """Check if an exception represents a file-not-found condition."""
-    if isinstance(exc, FileNotFoundError):
-        return True
-    try:
-        from mountainash_utils_files.exceptions import PathNotFoundError
-        return isinstance(exc, PathNotFoundError)
-    except ImportError:
-        return False
+    return isinstance(exc, (FileNotFoundError, PathNotFoundError))
