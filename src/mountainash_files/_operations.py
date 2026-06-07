@@ -156,6 +156,32 @@ def copy(
     _write_bytes(dst_path, data, sink.auth_profile, sink.create_path)
 
 
+@contextlib.contextmanager
+def stream(
+    source: FileSourceSpec,
+    *,
+    params: dict[str, Any] | None = None,
+) -> Iterator[BinaryIO]:
+    """Return a raw byte stream from a source as a context manager."""
+    path = source.path
+    if params:
+        path = path.format(**params)
+
+    try:
+        data = _read_bytes(path, source.auth_profile)
+    except (FileNotFoundError, Exception) as exc:
+        if source.on_missing == "skip" and _is_not_found(exc):
+            yield io.BytesIO(b"")
+            return
+        raise
+
+    buf = io.BytesIO(data)
+    try:
+        yield buf
+    finally:
+        buf.close()
+
+
 def _is_not_found(exc: Exception) -> bool:
     """Check if an exception represents a file-not-found condition."""
     return isinstance(exc, (FileNotFoundError, PathNotFoundError))
