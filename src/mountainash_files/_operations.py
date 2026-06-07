@@ -6,8 +6,9 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from mountainash_utils_files import StorageFacade, read_bytes as _utils_read_bytes
+from mountainash_utils_files import StorageFacade
 from mountainash_utils_files.exceptions import PathNotFoundError
+from mountainash_utils_files.storage_transforms import Pipeline
 
 from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._registry import (
@@ -20,6 +21,51 @@ from mountainash_files.formats._registry import (
 from mountainash_files.formats._types import FormatSpec, ParseResult
 from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
+
+
+def _make_facade(path: str, auth_profile: str | None) -> StorageFacade:
+    # TODO: resolve auth_profile string → auth_params once
+    # mountainash-utils-files re-adds profile resolution.
+    return StorageFacade.from_path(path)
+
+
+def _read_bytes(
+    path: str,
+    auth_profile: str | None,
+    transforms: Pipeline | None,
+    *,
+    infer: bool = True,
+) -> bytes:
+    """Read bytes via utils-files, applying transforms (decompress/decrypt).
+
+    When infer=True and no explicit transforms, auto-detects compression
+    from path suffixes (.gz, .gpg). Disable infer when archive extraction
+    will handle decompression separately.
+    """
+    facade = _make_facade(path, auth_profile)
+    if transforms is not None:
+        return facade.read(path, pipeline=transforms)
+    if infer:
+        return facade.read(path, infer=True)
+    return facade.read(path)
+
+
+def _write_bytes(
+    path: str,
+    data: bytes,
+    auth_profile: str | None,
+    create_path: bool,
+    transforms: Pipeline | None,
+) -> None:
+    """Write bytes via utils-files, applying transforms (compress/encrypt)."""
+    if "://" not in path:
+        p = Path(path)
+        if create_path:
+            p.parent.mkdir(parents=True, exist_ok=True)
+        elif not p.parent.exists():
+            raise WriteError(f"Parent directory does not exist: {p.parent}")
+    facade = _make_facade(path, auth_profile)
+    facade.write(path, data, pipeline=transforms)
 
 
 def parse(
@@ -35,10 +81,11 @@ def parse(
     if params:
         path = path.format(**params)
 
-    # Archive path: read bytes first, extract members, then parse each.
+    # Archive path: read raw bytes (no suffix inference — archive handles decompression),
+    # then extract members, then parse each.
     if source.archive is not None:
         try:
-            raw = _read_bytes(path, source.auth_profile)
+            raw = _read_bytes(path, source.auth_profile, source.transforms, infer=False)
         except (FileNotFoundError, Exception) as exc:
             if source.on_missing == "skip" and _is_not_found(exc):
                 return []
@@ -84,7 +131,7 @@ def parse(
         spec = get_spec_class(format_key)(**overrides)
 
     try:
-        data = _read_bytes(path, source.auth_profile)
+        data = _read_bytes(path, source.auth_profile, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
@@ -94,11 +141,6 @@ def parse(
     result_data = parser(data, spec)
 
     return [ParseResult(data=result_data, format_key=format_key, spec=spec)]
-
-
-def _read_bytes(path: str, auth_profile: str | None) -> bytes:
-    """Read bytes from a path via utils-files (handles local + remote)."""
-    return _utils_read_bytes(path)
 
 
 _APPENDABLE_FORMATS = frozenset({"parquet"})
@@ -117,7 +159,7 @@ def write(
 
     # Raw bytes bypass format handling
     if isinstance(data, bytes):
-        _write_bytes(path, data, sink.auth_profile, sink.create_path)
+        _write_bytes(path, data, sink.auth_profile, sink.create_path, sink.transforms)
         return
 
     # Resolve format
@@ -145,24 +187,7 @@ def write(
         raise WriteError(f"No serialiser registered for format {format_key!r}")
 
     serialised = serialiser(data, spec)
-    _write_bytes(path, serialised, sink.auth_profile, sink.create_path)
-
-
-def _write_bytes(
-    path: str,
-    data: bytes,
-    auth_profile: str | None,
-    create_path: bool,
-) -> None:
-    """Write bytes to a path via utils-files (handles local + remote)."""
-    if "://" not in path:
-        p = Path(path)
-        if create_path:
-            p.parent.mkdir(parents=True, exist_ok=True)
-        elif not p.parent.exists():
-            raise WriteError(f"Parent directory does not exist: {p.parent}")
-    facade = StorageFacade.from_path(path)
-    facade.write(path, data)
+    _write_bytes(path, serialised, sink.auth_profile, sink.create_path, sink.transforms)
 
 
 def copy(
@@ -171,7 +196,11 @@ def copy(
     *,
     params: dict[str, Any] | None = None,
 ) -> None:
-    """Copy bytes from source to destination without parsing."""
+    """Copy bytes from source to destination without parsing.
+
+    Source transforms unwrap (decompress/decrypt).
+    Sink transforms wrap (compress/encrypt).
+    """
     src_path = source.path
     dst_path = sink.path
     if params:
@@ -179,13 +208,13 @@ def copy(
         dst_path = dst_path.format(**params)
 
     try:
-        data = _read_bytes(src_path, source.auth_profile)
+        data = _read_bytes(src_path, source.auth_profile, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return
         raise
 
-    _write_bytes(dst_path, data, sink.auth_profile, sink.create_path)
+    _write_bytes(dst_path, data, sink.auth_profile, sink.create_path, sink.transforms)
 
 
 @contextlib.contextmanager
@@ -194,13 +223,16 @@ def stream(
     *,
     params: dict[str, Any] | None = None,
 ) -> Iterator[BinaryIO]:
-    """Return a raw byte stream from a source as a context manager."""
+    """Return a raw byte stream from a source as a context manager.
+
+    Applies transforms (decompress/decrypt) but no format parsing.
+    """
     path = source.path
     if params:
         path = path.format(**params)
 
     try:
-        data = _read_bytes(path, source.auth_profile)
+        data = _read_bytes(path, source.auth_profile, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             yield io.BytesIO(b"")
