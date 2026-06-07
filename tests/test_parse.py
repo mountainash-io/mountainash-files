@@ -10,6 +10,7 @@ from mountainash_files.specs.source import FileSourceSpec
 from mountainash_files.formats._types import ParseResult
 from mountainash_files.formats._exceptions import UnknownFormatError, ParseError
 from mountainash_files.formats.csv import CsvSpec
+from mountainash_files.specs.archive import ZipArchive, GzipCompression
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -96,3 +97,36 @@ class TestParseTsvFixture:
         assert results[0].format_key == "tsv"
         assert isinstance(results[0].data, pa.Table)
         assert results[0].data.num_rows == 2
+
+
+class TestParseWithArchive:
+    def test_gzip_csv(self):
+        source = FileSourceSpec(
+            path=str(FIXTURES / "sample.csv.gz"),
+            format="csv",
+            archive=GzipCompression(),
+        )
+        results = parse(source)
+        assert len(results) == 1
+        assert results[0].format_key == "csv"
+        assert results[0].data.num_rows == 3
+
+    def test_zip_csv(self):
+        source = FileSourceSpec(
+            path=str(FIXTURES / "sample.zip"),
+            archive=ZipArchive(file_pattern="*.csv"),
+        )
+        results = parse(source)
+        assert len(results) == 1
+        assert results[0].format_key == "csv"
+        assert results[0].data.num_rows == 3
+
+    def test_zip_all_parseable(self):
+        source = FileSourceSpec(
+            path=str(FIXTURES / "sample.zip"),
+            archive=ZipArchive(file_pattern="*"),
+        )
+        results = parse(source)
+        # Only CSV member is parseable (readme.txt has no registered format)
+        assert len(results) >= 1
+        assert any(r.format_key == "csv" for r in results)

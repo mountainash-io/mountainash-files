@@ -35,7 +35,41 @@ def parse(
     if params:
         path = path.format(**params)
 
-    # Resolve format before IO — unknown suffix raises immediately without touching the file.
+    # Archive path: read bytes first, extract members, then parse each.
+    if source.archive is not None:
+        try:
+            raw = _read_bytes(path, source.auth_profile)
+        except (FileNotFoundError, Exception) as exc:
+            if source.on_missing == "skip" and _is_not_found(exc):
+                return []
+            raise
+
+        from mountainash_files._archives import unpack_archive
+
+        members = list(unpack_archive(raw, source.archive))
+        results = []
+        for member_name, member_data in members:
+            try:
+                if isinstance(source.format, FormatSpec):
+                    fmt_key = source.format.FORMAT
+                    fmt_spec = source.format
+                elif isinstance(source.format, str):
+                    fmt_key, ms = resolve_format(format=source.format)
+                    fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
+                elif member_name:
+                    fmt_key, ms = resolve_format(path=member_name)
+                    fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
+                else:
+                    fmt_key, ms = resolve_format(path=path)
+                    fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
+            except Exception:
+                continue  # Skip members with unrecognised formats
+            parser = get_parser(fmt_key)
+            result_data = parser(member_data, fmt_spec)
+            results.append(ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec))
+        return results
+
+    # Non-archive: resolve format before IO — unknown suffix raises without touching the file.
     if isinstance(source.format, FormatSpec):
         format_key = source.format.FORMAT
         spec = source.format
@@ -49,11 +83,9 @@ def parse(
         overrides = get_suffix_overrides(matched_suffix)
         spec = get_spec_class(format_key)(**overrides)
 
-    # Phase 1: single file only (no glob, no archive)
     try:
         data = _read_bytes(path, source.auth_profile)
     except (FileNotFoundError, Exception) as exc:
-        # Catch both local FileNotFoundError and utils-files PathNotFoundError
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
         raise
