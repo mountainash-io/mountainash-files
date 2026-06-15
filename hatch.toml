@@ -11,7 +11,7 @@ packages = ["src/mountainash_files"]
 installer = "uv"
 path = ".venv"
 dependencies = [
-    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
+    "mountainash_transport @ {root:uri}/../mountainash-utils-files",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
 ]
@@ -30,7 +30,7 @@ dependencies = [
     "openpyxl>=3.1",
     "fastexcel>=0.12",
     "lxml>=4.9",
-    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
+    "mountainash_transport @ {root:uri}/../mountainash-utils-files",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
     "mountainash @             {root:uri}/../mountainash",

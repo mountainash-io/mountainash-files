@@ -11,7 +11,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 class TestTransformSuffixesSync:
     def test_utils_files_suffixes_are_subset(self):
         from mountainash_files.formats._registry import TRANSFORM_SUFFIXES
-        from mountainash_utils_files.path_helpers.suffixes import SUFFIX_TRANSFORMS
+        from mountainash_transport.storage.path_helpers.suffixes import SUFFIX_TRANSFORMS
 
         utils_suffixes = set(SUFFIX_TRANSFORMS.keys())
         assert utils_suffixes.issubset(TRANSFORM_SUFFIXES), (

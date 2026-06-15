@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "pyarrow>=16",
-    # "mountainash-utils-files",
+    # "mountainash-transport",
     # "mountainash-settings",
 ]
 
