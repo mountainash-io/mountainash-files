@@ -6,7 +6,7 @@ import typing as t
 if t.TYPE_CHECKING:
     from mountainash_files.formats._types import FormatSpec
     from mountainash_files.specs.archive import GzipCompression, ZipArchive
-    from mountainash_utils_files import Pipeline
+    from mountainash_transport import Pipeline
 
 
 @dataclasses.dataclass(frozen=True)

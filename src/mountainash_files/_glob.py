@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 from pathlib import Path
 
-from mountainash_utils_files import StorageFacade
+from mountainash_transport import StorageFacade
 
 from mountainash_files._operations import _resolve_auth
 
