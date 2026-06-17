@@ -16,6 +16,7 @@ class JsonSpec(FormatSpec):
 
     records_path: str | None = None
     ndjson: bool = False
+    empty_on_missing: bool = False
 
 
 def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> dict | list:
@@ -42,6 +43,11 @@ def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> dict | list:
         for key in spec.records_path.split("."):
             if isinstance(parsed, dict):
                 if key not in parsed:
+                    if spec.empty_on_missing:
+                        # An absent records collection means zero records — mirror an
+                        # explicit empty list rather than erroring (e.g. an API page
+                        # that omits the records key when the window has no data).
+                        return []
                     raise ParseError(
                         "json",
                         f"Key {key!r} not found at path {spec.records_path!r}",

@@ -46,6 +46,23 @@ class TestJsonParse:
         with pytest.raises(ParseError, match="json"):
             json_parse(data, JsonSpec(records_path="b.c"))
 
+    def test_records_path_missing_key_empty_on_missing(self):
+        # Opt-in: an absent records collection yields [] instead of raising.
+        data = b"{}"
+        result = json_parse(data, JsonSpec(records_path="dataPoints", empty_on_missing=True))
+        assert result == []
+
+    def test_records_path_missing_nested_key_empty_on_missing(self):
+        data = b'{"a": 1}'
+        result = json_parse(data, JsonSpec(records_path="b.c", empty_on_missing=True))
+        assert result == []
+
+    def test_records_path_present_empty_list_unaffected(self):
+        # empty_on_missing does not change behavior when the key IS present.
+        data = b'{"dataPoints": []}'
+        result = json_parse(data, JsonSpec(records_path="dataPoints", empty_on_missing=True))
+        assert result == []
+
     def test_ndjson(self):
         data = (FIXTURES / "sample.ndjson").read_bytes()
         result = json_parse(data, JsonSpec(ndjson=True))
