@@ -41,7 +41,7 @@ def _read_bytes(
     *,
     infer: bool = True,
 ) -> bytes:
-    """Read bytes via utils-files, applying transforms (decompress/decrypt).
+    """Read bytes via transport, applying transforms (decompress/decrypt).
 
     When infer=True and no explicit transforms, auto-detects compression
     from path suffixes (.gz, .gpg). Disable infer when archive extraction
@@ -62,7 +62,7 @@ def _write_bytes(
     create_path: bool,
     transforms: Pipeline | None,
 ) -> None:
-    """Write bytes via utils-files, applying transforms (compress/encrypt)."""
+    """Write bytes via transport, applying transforms (compress/encrypt)."""
     if "://" not in path:
         p = Path(path)
         if create_path:
