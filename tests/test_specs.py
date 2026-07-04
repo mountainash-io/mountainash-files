@@ -18,9 +18,9 @@ class TestFileSpec:
         spec = FileSpec(path="/local/data.csv", format="csv")
         assert spec.format == "csv"
 
-    def test_with_auth_profile(self):
-        spec = FileSpec(path="s3://bucket/data.csv", auth_profile="production-s3")
-        assert spec.auth_profile == "production-s3"
+    def test_with_storage_profile_name(self):
+        spec = FileSpec(path="s3://bucket/data.csv", storage_profile="production-s3")
+        assert spec.storage_profile == "production-s3"
 
     def test_frozen(self):
         spec = FileSpec(path="/data.csv")
@@ -69,3 +69,64 @@ class TestArchiveSpecs:
             archive=ZipArchive(file_pattern="*.csv"),
         )
         assert isinstance(spec.archive, ZipArchive)
+
+
+class TestProfileFields:
+    def test_spec_accepts_profile_objects(self):
+        from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+        profile = LocalStorageProfile()
+        spec = FileSourceSpec(path="/tmp/x.csv", storage_profile=profile)
+        assert spec.storage_profile is profile
+        assert spec.auth_profile is None
+
+    def test_spec_accepts_profile_name(self):
+        spec = FileSourceSpec(path="s3://b/x.csv", storage_profile="lake")
+        assert spec.storage_profile == "lake"
+
+    def test_resolve_profiles_passthrough_for_objects(self):
+        from mountainash_files._operations import _resolve_profiles
+        from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+        profile = LocalStorageProfile()
+        spec = FileSourceSpec(path="/tmp/x.csv", storage_profile=profile)
+        resolved_profile, resolved_auth = _resolve_profiles(spec)
+        assert resolved_profile is profile
+        assert resolved_auth is None
+
+    def test_resolve_profiles_by_name(self, tmp_path, monkeypatch):
+        from mountainash_auth_client import NoAuthProfile
+        from mountainash_files._operations import _resolve_profiles
+        from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+        cfg = tmp_path / "profiles.yaml"
+        cfg.write_text(
+            "storage_profiles:\n"
+            "  scratch:\n"
+            "    provider: local\n"
+            "    parameters:\n"
+            "      ROOT_PATH: null\n"
+        )
+        monkeypatch.setenv("MOUNTAINASH_PROFILES_CONFIG", str(cfg))
+        spec = FileSourceSpec(path="/tmp/x.csv", storage_profile="scratch")
+        resolved_profile, resolved_auth = _resolve_profiles(spec)
+        assert isinstance(resolved_profile, LocalStorageProfile)
+        assert isinstance(resolved_auth, NoAuthProfile)
+
+    def test_explicit_auth_overrides_resolved(self, tmp_path, monkeypatch):
+        from mountainash_auth_client import TokenAuthProfile
+        from mountainash_files._operations import _resolve_profiles
+
+        cfg = tmp_path / "profiles2.yaml"
+        cfg.write_text(
+            "storage_profiles:\n"
+            "  web:\n"
+            "    provider: http\n"
+        )
+        monkeypatch.setenv("MOUNTAINASH_PROFILES_CONFIG", str(cfg))
+        token = TokenAuthProfile(TOKEN="t0k3n")
+        spec = FileSourceSpec(
+            path="https://example.com/x.csv", storage_profile="web", auth_profile=token
+        )
+        _, resolved_auth = _resolve_profiles(spec)
+        assert resolved_auth is token

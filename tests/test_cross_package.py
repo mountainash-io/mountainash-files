@@ -30,3 +30,24 @@ class TestParseToRelation:
 
         rel = ma.relation(results[0].data)
         assert rel is not None
+
+
+class TestNamedProfileRead:
+    def test_parse_csv_via_named_local_profile(self, tmp_path, monkeypatch):
+        data_file = tmp_path / "named.csv"
+        data_file.write_text("a,b\n1,2\n")
+        cfg = tmp_path / "profiles.yaml"
+        cfg.write_text(
+            "storage_profiles:\n"
+            "  scratch:\n"
+            "    provider: local\n"
+            "    parameters:\n"
+            "      ROOT_PATH: null\n"
+        )
+        monkeypatch.setenv("MOUNTAINASH_PROFILES_CONFIG", str(cfg))
+
+        from mountainash_files import FileSourceSpec, parse
+
+        results = parse(FileSourceSpec(path=str(data_file), storage_profile="scratch"))
+        assert len(results) == 1
+        assert results[0].data.num_rows == 1
