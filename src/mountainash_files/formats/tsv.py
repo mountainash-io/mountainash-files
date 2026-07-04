@@ -19,6 +19,9 @@ class TsvSpec(FormatSpec):
     header_row: int | None = 0
     columns: tuple[str, ...] | None = None
     dtypes: tuple[tuple[str, str], ...] | None = None
+    quote_char: str | None = None
+    escape_char: str | None = None
+    null_values: tuple[str, ...] | None = None
 
 
 register_format(TsvSpec, csv_parse)
