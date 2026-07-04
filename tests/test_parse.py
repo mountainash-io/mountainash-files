@@ -130,3 +130,52 @@ class TestParseWithArchive:
         # Only CSV member is parseable (readme.txt has no registered format)
         assert len(results) >= 1
         assert any(r.format_key == "csv" for r in results)
+
+
+class TestParseBytes:
+    def test_parse_csv_bytes(self):
+        from mountainash_files import parse_bytes
+
+        result = parse_bytes(b"a,b\n1,2\n", "csv")
+        assert result.format_key == "csv"
+        assert result.data.num_rows == 1
+
+    def test_parse_bytes_accepts_binaryio(self):
+        import io
+
+        from mountainash_files import parse_bytes
+
+        result = parse_bytes(io.BytesIO(b"a,b\n1,2\n"), "csv")
+        assert result.data.num_rows == 1
+
+    def test_parse_bytes_with_format_spec(self):
+        from mountainash_files import parse_bytes
+        from mountainash_files.formats.csv import CsvSpec
+
+        result = parse_bytes(b"a;b\n1;2\n", CsvSpec(delimiter=";"))
+        assert result.data.num_rows == 1
+
+    def test_parse_bytes_unknown_format_raises(self):
+        import pytest
+
+        from mountainash_files import UnknownFormatError, parse_bytes
+
+        with pytest.raises(UnknownFormatError):
+            parse_bytes(b"x", "nosuchformat")
+
+
+class TestSerialiseBytes:
+    def test_roundtrip_csv(self):
+        from mountainash_files import parse_bytes, serialise_bytes
+
+        table = parse_bytes(b"a,b\n1,2\n", "csv").data
+        out = serialise_bytes(table, "csv")
+        assert parse_bytes(out, "csv").data.num_rows == 1
+
+    def test_no_serialiser_raises_write_error(self):
+        import pytest
+
+        from mountainash_files import WriteError, serialise_bytes
+
+        with pytest.raises(WriteError):
+            serialise_bytes(object(), "xlsx")   # xlsx registers no serialiser

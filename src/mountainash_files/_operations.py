@@ -4,10 +4,9 @@ import contextlib
 import io
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from mountainash_transport import PathNotFoundError, Pipeline, StorageFacade
-# from mountainash_transport.settings import load_storage
 
 from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._registry import (
@@ -18,25 +17,46 @@ from mountainash_files.formats._registry import (
     resolve_format,
 )
 from mountainash_files.formats._types import FormatSpec, ParseResult
+from mountainash_files.specs.base import FileSpec
 from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
 
-
-def _resolve_auth(auth_profile: str | None) -> tuple:
-    """Resolve an auth_profile name to materialised (profile, auth) instances."""
-    if auth_profile is None:
-        return None, None
-    return load_storage(auth_profile)
+if TYPE_CHECKING:
+    from mountainash_auth_client import AuthProfile
+    from mountainash_transport import StorageProfileProtocol
 
 
-def _make_facade(path: str, auth_profile: str | None) -> StorageFacade:
-    profile, auth = _resolve_auth(auth_profile)
-    return StorageFacade.from_path(path, storage_profile=profile, auth_profile=auth)
+def _resolve_profiles(
+    spec: FileSpec,
+) -> tuple["StorageProfileProtocol | None", "AuthProfile | None"]:
+    """Materialise the spec's profile fields (spec semantics table).
+
+    A string storage_profile resolves via transport's resolve_storage;
+    an explicitly passed auth_profile object always wins.
+    """
+    storage = spec.storage_profile
+    if isinstance(storage, str):
+        from mountainash_transport import resolve_storage
+
+        profile, auth = resolve_storage(storage)
+        if spec.auth_profile is not None:
+            auth = spec.auth_profile
+        return profile, auth
+    return storage, spec.auth_profile
+
+
+def _make_facade(
+    path: str,
+    storage_profile: "StorageProfileProtocol | None",
+    auth_profile: "AuthProfile | None",
+) -> StorageFacade:
+    return StorageFacade.from_path(path, storage_profile, auth_profile=auth_profile)
 
 
 def _read_bytes(
     path: str,
-    auth_profile: str | None,
+    storage_profile: "StorageProfileProtocol | None",
+    auth_profile: "AuthProfile | None",
     transforms: Pipeline | None,
     *,
     infer: bool = True,
@@ -47,7 +67,7 @@ def _read_bytes(
     from path suffixes (.gz, .gpg). Disable infer when archive extraction
     will handle decompression separately.
     """
-    facade = _make_facade(path, auth_profile)
+    facade = _make_facade(path, storage_profile, auth_profile)
     if transforms is not None:
         return facade.read(path, pipeline=transforms)
     if infer:
@@ -58,7 +78,8 @@ def _read_bytes(
 def _write_bytes(
     path: str,
     data: bytes,
-    auth_profile: str | None,
+    storage_profile: "StorageProfileProtocol | None",
+    auth_profile: "AuthProfile | None",
     create_path: bool,
     transforms: Pipeline | None,
 ) -> None:
@@ -69,7 +90,7 @@ def _write_bytes(
             p.parent.mkdir(parents=True, exist_ok=True)
         elif not p.parent.exists():
             raise WriteError(f"Parent directory does not exist: {p.parent}")
-    facade = _make_facade(path, auth_profile)
+    facade = _make_facade(path, storage_profile, auth_profile)
     facade.write(path, data, pipeline=transforms)
 
 
@@ -86,17 +107,25 @@ def parse(
     if params:
         path = path.format(**params)
 
+    storage_profile, auth_profile = _resolve_profiles(source)
+
     # Glob resolution
     if source.glob is not None:
         from mountainash_files._glob import resolve_glob
 
-        paths = resolve_glob(path, source.glob, auth_profile=source.auth_profile)
+        paths = resolve_glob(
+            path,
+            source.glob,
+            storage_profile=storage_profile,
+            auth_profile=auth_profile,
+        )
         results = []
         for file_path in paths:
             child_source = FileSourceSpec(
                 path=file_path,
                 format=source.format,
-                auth_profile=source.auth_profile,
+                storage_profile=storage_profile,
+                auth_profile=auth_profile,
                 archive=source.archive,
                 transforms=source.transforms,
                 on_missing=source.on_missing,
@@ -108,7 +137,9 @@ def parse(
     # then extract members, then parse each.
     if source.archive is not None:
         try:
-            raw = _read_bytes(path, source.auth_profile, source.transforms, infer=False)
+            raw = _read_bytes(
+                path, storage_profile, auth_profile, source.transforms, infer=False
+            )
         except (FileNotFoundError, Exception) as exc:
             if source.on_missing == "skip" and _is_not_found(exc):
                 return []
@@ -154,7 +185,7 @@ def parse(
         spec = get_spec_class(format_key)(**overrides)
 
     try:
-        data = _read_bytes(path, source.auth_profile, source.transforms)
+        data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
@@ -180,9 +211,11 @@ def write(
     if params:
         path = path.format(**params)
 
+    storage_profile, auth_profile = _resolve_profiles(sink)
+
     # Raw bytes bypass format handling
     if isinstance(data, bytes):
-        _write_bytes(path, data, sink.auth_profile, sink.create_path, sink.transforms)
+        _write_bytes(path, data, storage_profile, auth_profile, sink.create_path, sink.transforms)
         return
 
     # Resolve format
@@ -210,7 +243,9 @@ def write(
         raise WriteError(f"No serialiser registered for format {format_key!r}")
 
     serialised = serialiser(data, spec)
-    _write_bytes(path, serialised, sink.auth_profile, sink.create_path, sink.transforms)
+    _write_bytes(
+        path, serialised, storage_profile, auth_profile, sink.create_path, sink.transforms
+    )
 
 
 def copy(
@@ -230,14 +265,17 @@ def copy(
         src_path = src_path.format(**params)
         dst_path = dst_path.format(**params)
 
+    src_profile, src_auth = _resolve_profiles(source)
+    dst_profile, dst_auth = _resolve_profiles(sink)
+
     try:
-        data = _read_bytes(src_path, source.auth_profile, source.transforms)
+        data = _read_bytes(src_path, src_profile, src_auth, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return
         raise
 
-    _write_bytes(dst_path, data, sink.auth_profile, sink.create_path, sink.transforms)
+    _write_bytes(dst_path, data, dst_profile, dst_auth, sink.create_path, sink.transforms)
 
 
 @contextlib.contextmanager
@@ -254,8 +292,10 @@ def stream(
     if params:
         path = path.format(**params)
 
+    storage_profile, auth_profile = _resolve_profiles(source)
+
     try:
-        data = _read_bytes(path, source.auth_profile, source.transforms)
+        data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             yield io.BytesIO(b"")
@@ -272,3 +312,34 @@ def stream(
 def _is_not_found(exc: Exception) -> bool:
     """Check if an exception represents a file-not-found condition."""
     return isinstance(exc, (FileNotFoundError, PathNotFoundError))
+
+
+def _resolve_format_spec(format: str | FormatSpec) -> tuple[str, FormatSpec]:
+    if isinstance(format, FormatSpec):
+        return format.FORMAT, format
+    format_key, matched_suffix = resolve_format(format=format)
+    overrides = get_suffix_overrides(matched_suffix)
+    return format_key, get_spec_class(format_key)(**overrides)
+
+
+def parse_bytes(data: bytes | BinaryIO, format: str | FormatSpec) -> ParseResult:
+    """Parse an in-memory buffer with an explicit format.
+
+    The path-based :func:`parse` remains the primary entry; this exposes
+    the format registry for bytes the caller already holds (HTTP bodies,
+    message payloads, fixtures) without a fake temp path.
+    """
+    if not isinstance(data, bytes):
+        data = data.read()
+    format_key, spec = _resolve_format_spec(format)
+    parser = get_parser(format_key)
+    return ParseResult(data=parser(data, spec), format_key=format_key, spec=spec)
+
+
+def serialise_bytes(data: Any, format: str | FormatSpec) -> bytes:
+    """Serialise data to bytes with an explicit format (inverse of parse_bytes)."""
+    format_key, spec = _resolve_format_spec(format)
+    serialiser = get_serialiser(format_key)
+    if serialiser is None:
+        raise WriteError(f"No serialiser registered for format {format_key!r}")
+    return serialiser(data, spec)
