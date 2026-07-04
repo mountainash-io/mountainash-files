@@ -1,7 +1,7 @@
 """mountainash-files: Composable file operations with format detection and parsing."""
 
 from mountainash_files._exceptions import MissingDependencyError, WriteError
-from mountainash_files._operations import copy, parse, stream, write
+from mountainash_files._operations import copy, parse, parse_bytes, serialise_bytes, stream, write
 from mountainash_files.formats._exceptions import (
     FormatConflictError,
     FormatError,
@@ -21,6 +21,8 @@ import mountainash_files.formats  # noqa: F401
 __all__ = [
     "copy",
     "parse",
+    "parse_bytes",
+    "serialise_bytes",
     "stream",
     "write",
     "register_format",

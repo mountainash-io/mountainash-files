@@ -312,3 +312,34 @@ def stream(
 def _is_not_found(exc: Exception) -> bool:
     """Check if an exception represents a file-not-found condition."""
     return isinstance(exc, (FileNotFoundError, PathNotFoundError))
+
+
+def _resolve_format_spec(format: str | FormatSpec) -> tuple[str, FormatSpec]:
+    if isinstance(format, FormatSpec):
+        return format.FORMAT, format
+    format_key, matched_suffix = resolve_format(format=format)
+    overrides = get_suffix_overrides(matched_suffix)
+    return format_key, get_spec_class(format_key)(**overrides)
+
+
+def parse_bytes(data: bytes | BinaryIO, format: str | FormatSpec) -> ParseResult:
+    """Parse an in-memory buffer with an explicit format.
+
+    The path-based :func:`parse` remains the primary entry; this exposes
+    the format registry for bytes the caller already holds (HTTP bodies,
+    message payloads, fixtures) without a fake temp path.
+    """
+    if not isinstance(data, bytes):
+        data = data.read()
+    format_key, spec = _resolve_format_spec(format)
+    parser = get_parser(format_key)
+    return ParseResult(data=parser(data, spec), format_key=format_key, spec=spec)
+
+
+def serialise_bytes(data: Any, format: str | FormatSpec) -> bytes:
+    """Serialise data to bytes with an explicit format (inverse of parse_bytes)."""
+    format_key, spec = _resolve_format_spec(format)
+    serialiser = get_serialiser(format_key)
+    if serialiser is None:
+        raise WriteError(f"No serialiser registered for format {format_key!r}")
+    return serialiser(data, spec)
