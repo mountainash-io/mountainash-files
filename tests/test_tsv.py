@@ -40,3 +40,10 @@ class TestTsvParse:
         table = csv_parse(data, TsvSpec())
         assert table.num_rows == 2
         assert "name" in table.column_names
+
+    def test_dialect_null_values(self):
+        # TsvSpec shares csv_parse; its dialect fields must route through.
+        data = b"a\tb\nNA\tx\n1\tNA\n"
+        table = csv_parse(data, TsvSpec(null_values=("NA",)))
+        assert table.column("a").to_pylist() == [None, 1]
+        assert table.column("b").to_pylist() == ["x", None]

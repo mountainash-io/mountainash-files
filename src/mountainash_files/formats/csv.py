@@ -23,6 +23,9 @@ class CsvSpec(FormatSpec):
     header_row: int | None = 0
     columns: tuple[str, ...] | None = None
     dtypes: tuple[tuple[str, str], ...] | None = None
+    quote_char: str | None = None
+    escape_char: str | None = None
+    null_values: tuple[str, ...] | None = None
 
 
 def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
@@ -42,12 +45,31 @@ def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
         autogenerate_column_names=(spec.header_row is None),
         encoding=spec.encoding,
     )
-    parse_options = pcsv.ParseOptions(delimiter=spec.delimiter)
+    # Read dialect options defensively: csv_parse is shared by CsvSpec and
+    # TsvSpec (and any future delimited-text spec), which need not all declare
+    # every field.
+    quote_char = getattr(spec, "quote_char", None)
+    escape_char = getattr(spec, "escape_char", None)
+    null_values = getattr(spec, "null_values", None)
 
-    convert_options = None
+    parse_kwargs: dict = {"delimiter": spec.delimiter}
+    if quote_char is not None:
+        parse_kwargs["quote_char"] = quote_char
+    if escape_char is not None:
+        parse_kwargs["escape_char"] = escape_char
+    parse_options = pcsv.ParseOptions(**parse_kwargs)
+
+    convert_kwargs: dict = {}
     if spec.dtypes is not None:
-        column_types = {name: pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes}
-        convert_options = pcsv.ConvertOptions(column_types=column_types)
+        convert_kwargs["column_types"] = {
+            name: pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes
+        }
+    if null_values is not None:
+        # Custom null tokens replace pyarrow's defaults; strings_can_be_null lets
+        # them nullify string columns too (matches Frictionless nullSequence).
+        convert_kwargs["null_values"] = list(null_values)
+        convert_kwargs["strings_can_be_null"] = True
+    convert_options = pcsv.ConvertOptions(**convert_kwargs) if convert_kwargs else None
 
     try:
         table = pcsv.read_csv(

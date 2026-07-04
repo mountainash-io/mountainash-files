@@ -69,3 +69,31 @@ class TestCsvParse:
     def test_empty_file_raises(self):
         with pytest.raises(ParseError, match="csv"):
             csv_parse(b"", CsvSpec())
+
+    def test_custom_quote_char(self):
+        # Pipe-quoted fields containing the delimiter must stay intact.
+        data = b"a,b\n|1,2|,x\n"
+        table = csv_parse(data, CsvSpec(quote_char="|"))
+        assert table.column_names == ["a", "b"]
+        assert table.num_rows == 1
+        assert table.column(0).to_pylist() == ["1,2"]
+
+    def test_escape_char(self):
+        # Backslash-escaped quote inside a quoted field.
+        data = b'a\n"he said \\"hi\\""\n'
+        table = csv_parse(data, CsvSpec(escape_char="\\"))
+        assert table.num_rows == 1
+        assert table.column(0).to_pylist() == ['he said "hi"']
+
+    def test_null_values(self):
+        # Custom null token nullifies matching cells, including string columns.
+        data = b"a,b\nNA,x\n1,NA\n"
+        table = csv_parse(data, CsvSpec(null_values=("NA",)))
+        assert table.column("a").to_pylist() == [None, 1]
+        assert table.column("b").to_pylist() == ["x", None]
+
+    def test_new_dialect_defaults_are_none(self):
+        spec = CsvSpec()
+        assert spec.quote_char is None
+        assert spec.escape_char is None
+        assert spec.null_values is None
