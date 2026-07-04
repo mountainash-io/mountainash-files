@@ -14,6 +14,7 @@ dependencies = [
     "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
+    "mountainash_secrets @     {root:uri}/../mountainash-secrets",
 ]
 
 [[envs.test.matrix]]
@@ -33,6 +34,7 @@ dependencies = [
     "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
+    "mountainash_secrets @     {root:uri}/../mountainash-secrets",
     "mountainash @             {root:uri}/../mountainash",
     "mountainash_files @ {root:uri}",
 ]

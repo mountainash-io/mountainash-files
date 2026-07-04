@@ -22,16 +22,18 @@ classifiers = [
 ]
 dependencies = [
     "pyarrow>=16",
-    # "mountainash-transport",
-    # "mountainash-settings",
+    "mountainash-transport>=26.7.0",
 ]
 
+[tool.uv.sources]
+mountainash-transport = { path = "../mountainash-transport" }
+
 [project.optional-dependencies]
-xlsx = ["fastexcel>=0.12"]
-xlsx-compat = ["openpyxl>=3.1"]
+xlsx = ["fastexcel>=0.12", "openpyxl>=3.1"]
 xml = ["lxml>=4.9"]
-all = [
-    # "mountainash-files[xlsx]",
-    # "mountainash-files[xlsx-compat]",
-    # "mountainash-files[xml]",
-]
+s3 = ["mountainash-transport[s3]>=26.7.0"]
+gcs = ["mountainash-transport[gcs]>=26.7.0"]
+azure = ["mountainash-transport[azure]>=26.7.0"]
+sftp = ["mountainash-transport[sftp]>=26.7.0"]
+encryption = ["mountainash-transport[encryption]>=26.7.0"]
+all = ["mountainash-files[xlsx,xml,s3,gcs,azure,sftp,encryption]"]
