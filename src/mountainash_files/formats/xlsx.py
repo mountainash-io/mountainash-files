@@ -58,16 +58,19 @@ def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
             return table
         except ImportError:
             if spec.engine == "fastexcel":
-                raise
+                from mountainash_files._exceptions import MissingDependencyError
+
+                raise MissingDependencyError(
+                    "XLSX parsing with the fastexcel engine", "xlsx"
+                ) from None
 
     if use_openpyxl:
         try:
             import openpyxl
         except ImportError:
-            raise ImportError(
-                "XLSX decoding requires fastexcel or openpyxl. "
-                "Install with: pip install mountainash-files[xlsx]"
-            )
+            from mountainash_files._exceptions import MissingDependencyError
+
+            raise MissingDependencyError("XLSX parsing", "xlsx") from None
 
         try:
             wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
@@ -101,10 +104,9 @@ def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
 
         return pa.table(columns)
 
-    raise ImportError(
-        "XLSX decoding requires fastexcel or openpyxl. "
-        "Install with: pip install mountainash-files[xlsx]"
-    )
+    from mountainash_files._exceptions import MissingDependencyError
+
+    raise MissingDependencyError("XLSX parsing", "xlsx") from None
 
 
 register_format(
