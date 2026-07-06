@@ -13,6 +13,10 @@ from mountainash_files.formats._types import FormatSpec
 class JsonSpec(FormatSpec):
     FORMAT: ClassVar[str] = "json"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".json", ".ndjson", ".jsonl")
+    MEDIATYPES: ClassVar[tuple[str, ...]] = (
+        "application/json",
+        "application/x-ndjson",
+    )
 
     records_path: str | None = None
     ndjson: bool = False
