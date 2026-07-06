@@ -27,3 +27,15 @@ class ParseError(FormatError):
 
 class FormatConflictError(FormatError):
     """Registering a format that already exists without override=True."""
+
+
+class FormatResolutionError(FormatError):
+    """A lazy format reference failed to resolve at use time."""
+
+    def __init__(self, *, format_key: str, ref: str, field: str):
+        self.format_key = format_key
+        self.ref = ref
+        self.field = field
+        super().__init__(
+            f"Failed to resolve {field} for format {format_key!r}: {ref}"
+        )
