@@ -34,7 +34,11 @@ _DISCOVERY_DONE: bool = False
 
 
 def _reset_registry() -> None:
-    """Clear all registrations and the discovery latch. For testing only."""
+    """Reset registrations to built-ins and clear the discovery latch.
+
+    Tests use this to isolate plugin/user registrations without making later
+    parse tests depend on import-order side effects.
+    """
     global _DISCOVERY_DONE
     with _LOCK:
         _SPECS.clear()
@@ -45,6 +49,43 @@ def _reset_registry() -> None:
         _SUFFIX_OVERRIDES.clear()
         _FAILED_ENTRYPOINTS.clear()
         _DISCOVERY_DONE = False
+        _register_builtin_formats()
+
+
+def _register_builtin_formats() -> None:
+    from mountainash_files.formats.csv import CsvSpec, csv_parse, csv_serialise
+    from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
+    from mountainash_files.formats.parquet import (
+        ParquetSpec,
+        parquet_parse,
+        parquet_serialise,
+    )
+    from mountainash_files.formats.tsv import TsvSpec
+    from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
+    from mountainash_files.formats.xml import XmlSpec, xml_parse, xml_serialise
+
+    register_format(CsvSpec, csv_parse, serialiser=csv_serialise, override=True)
+    register_format(
+        JsonSpec,
+        json_parse,
+        serialiser=json_serialise,
+        suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
+        override=True,
+    )
+    register_format(
+        ParquetSpec,
+        parquet_parse,
+        serialiser=parquet_serialise,
+        override=True,
+    )
+    register_format(TsvSpec, csv_parse, override=True)
+    register_format(
+        XlsxSpec,
+        xlsx_parse,
+        suffix_overrides={".xlsb": {"engine": "fastexcel"}},
+        override=True,
+    )
+    register_format(XmlSpec, xml_parse, serialiser=xml_serialise, override=True)
 
 
 def _validate_dotted(ref: str, what: str) -> None:

@@ -47,14 +47,7 @@ def test_mediatype_param_stripping_and_case():
 
 
 def test_mediatype_structured_suffix_fallback():
-    @dataclasses.dataclass(frozen=True)
-    class JsonySpec(FormatSpec):
-        FORMAT: ClassVar[str] = "jsony"
-        SUFFIXES: ClassVar[tuple[str, ...]] = ()
-        MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/json",)
-
-    register_format(JsonySpec, toy_parse)
-    assert resolve_format(mediatype="application/geo+json") == ("jsony", None)
+    assert resolve_format(mediatype="application/geo+json") == ("json", None)
 
 
 def test_mediatype_exact_beats_structured_suffix():
@@ -64,14 +57,7 @@ def test_mediatype_exact_beats_structured_suffix():
         SUFFIXES: ClassVar[tuple[str, ...]] = ()
         MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/geo+json",)
 
-    @dataclasses.dataclass(frozen=True)
-    class JsonySpec(FormatSpec):
-        FORMAT: ClassVar[str] = "jsony"
-        SUFFIXES: ClassVar[tuple[str, ...]] = ()
-        MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/json",)
-
     register_format(GeoSpec, toy_parse)
-    register_format(JsonySpec, toy_parse)
     assert resolve_format(mediatype="application/geo+json")[0] == "geojson"
 
 
