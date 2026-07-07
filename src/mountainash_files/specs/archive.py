@@ -18,3 +18,4 @@ class ZipArchive:
     sort_order: str = "name"
     password: str | None = None
     inner: GzipCompression | None = None
+    on_unrecognised: str = "error"

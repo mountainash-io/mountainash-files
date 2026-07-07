@@ -125,7 +125,7 @@ class TestParseWithArchive:
     def test_zip_all_parseable(self):
         source = FileSourceSpec(
             path=str(FIXTURES / "sample.zip"),
-            archive=ZipArchive(file_pattern="*"),
+            archive=ZipArchive(file_pattern="*", on_unrecognised="skip"),
         )
         results = parse(source)
         # Only CSV member is parseable (readme.txt has no registered format)

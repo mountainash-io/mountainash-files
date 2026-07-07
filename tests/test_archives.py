@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from mountainash_files._archives import unpack_archive, ArchiveExtractionError, ArchiveEmptyMatchError
+from mountainash_files import FileSourceSpec, ParseError, parse
 from mountainash_files.specs.archive import ZipArchive, GzipCompression
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -65,3 +66,50 @@ class TestZipExtraction:
         assert len(members) == 1
         _, payload = members[0]
         assert payload == csv_data
+
+
+def _zip_bytes(members: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name, data in members.items():
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+def test_unrecognised_member_errors_by_default(tmp_path):
+    path = tmp_path / "mixed.zip"
+    path.write_bytes(_zip_bytes({"data.csv": b"a\n1\n", "README.xyz": b"hi"}))
+    with pytest.raises(ParseError, match="README.xyz"):
+        parse(FileSourceSpec(path=str(path), archive=ZipArchive()))
+
+
+def test_unrecognised_member_skip_mode_records_names(tmp_path):
+    path = tmp_path / "mixed.zip"
+    path.write_bytes(_zip_bytes({"data.csv": b"a\n1\n", "README.xyz": b"hi"}))
+    results = parse(
+        FileSourceSpec(path=str(path), archive=ZipArchive(on_unrecognised="skip"))
+    )
+    assert len(results) == 1
+    assert results[0].skipped_members == ("README.xyz",)
+
+
+def test_zero_recognised_members_raises_even_under_skip(tmp_path):
+    path = tmp_path / "junk.zip"
+    path.write_bytes(_zip_bytes({"a.xyz": b"x", "b.xyz": b"y"}))
+    with pytest.raises(ParseError, match="no recognised members"):
+        parse(
+            FileSourceSpec(
+                path=str(path),
+                archive=ZipArchive(on_unrecognised="skip"),
+            )
+        )
+
+
+def test_file_pattern_exclusion_is_not_unrecognised(tmp_path):
+    path = tmp_path / "mixed.zip"
+    path.write_bytes(_zip_bytes({"data.csv": b"a\n1\n", "README.xyz": b"hi"}))
+    results = parse(
+        FileSourceSpec(path=str(path), archive=ZipArchive(file_pattern="*.csv"))
+    )
+    assert len(results) == 1
+    assert results[0].skipped_members == ()

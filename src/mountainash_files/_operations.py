@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import io
+import logging
 import typing as t
 from collections.abc import Iterator
 from pathlib import Path
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
     from mountainash_transport import StorageProfileProtocol
 
 _VALID_OUTPUTS = ("arrow", "pydata")
+_logger = logging.getLogger(__name__)
 
 
 def _check_output(output: str) -> None:
@@ -192,7 +195,9 @@ def parse(
         from mountainash_files._archives import unpack_archive
 
         members = list(unpack_archive(raw, source.archive))
+        on_unrecognised = getattr(source.archive, "on_unrecognised", "error")
         results = []
+        skipped: list[str] = []
         for member_name, member_data in members:
             try:
                 if isinstance(source.format, FormatSpec):
@@ -207,11 +212,35 @@ def parse(
                 else:
                     fmt_key, ms = resolve_format(path=path)
                     fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
-            except Exception:
-                continue  # Skip members with unrecognised formats
+            except Exception as exc:
+                if on_unrecognised == "skip":
+                    skipped.append(member_name)
+                    _logger.warning(
+                        "Skipping archive member %r (unrecognised format): %s",
+                        member_name,
+                        exc,
+                    )
+                    continue
+                raise ParseError(
+                    "archive",
+                    f"member {member_name!r} in {path!r} has no resolvable "
+                    f"format ({exc}); scope members with file_pattern or set "
+                    "on_unrecognised='skip'",
+                ) from exc
             parser = get_parser(fmt_key)
             result_data = _normalise_output(parser(member_data, fmt_spec), output, fmt_spec)
             results.append(ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec))
+        if not results:
+            raise ParseError(
+                "archive",
+                f"archive {path!r} produced no recognised members "
+                f"(skipped: {skipped or 'none'})",
+            )
+        if skipped:
+            results = [
+                dataclasses.replace(result, skipped_members=tuple(skipped))
+                for result in results
+            ]
         return results
 
     # Non-archive: resolve format before IO — unknown suffix raises without touching the file.

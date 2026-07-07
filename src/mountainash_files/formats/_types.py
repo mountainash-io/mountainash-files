@@ -107,3 +107,4 @@ class ParseResult:
     data: Any
     format_key: str
     spec: FormatSpec
+    skipped_members: tuple[str, ...] = ()
