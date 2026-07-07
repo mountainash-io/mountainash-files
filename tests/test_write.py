@@ -122,3 +122,40 @@ class TestWriteLocal:
         )
         with pytest.raises(WriteError, match="append"):
             write(sink, table)
+
+
+def test_append_capability_is_spec_declared(tmp_path):
+    """APPENDABLE ClassVar replaces the hardcoded set (rev-3 spec §7)."""
+    import dataclasses
+    from typing import ClassVar
+
+    from mountainash_files.formats._registry import register_format
+    from mountainash_files.formats._types import FormatSpec
+
+    @dataclasses.dataclass(frozen=True)
+    class AppSpec(FormatSpec):
+        FORMAT: ClassVar[str] = "apptest"
+        SUFFIXES: ClassVar[tuple[str, ...]] = (".apptest",)
+        APPENDABLE: ClassVar[bool] = True
+
+    register_format(AppSpec, lambda d, s: d, serialiser=lambda d, s: bytes(d))
+    write(
+        FileSinkSpec(
+            path=str(tmp_path / "x.apptest"),
+            format="apptest",
+            write_disposition="append",
+        ),
+        bytearray(b"abc"),
+    )
+
+
+def test_append_rejected_for_non_appendable_format(tmp_path):
+    with pytest.raises(WriteError, match="does not support append"):
+        write(
+            FileSinkSpec(
+                path=str(tmp_path / "x.csv"),
+                format="csv",
+                write_disposition="append",
+            ),
+            [{"a": 1}],
+        )
