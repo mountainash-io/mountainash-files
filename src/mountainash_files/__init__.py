@@ -5,9 +5,11 @@ from mountainash_files._operations import copy, parse, parse_bytes, serialise_by
 from mountainash_files.formats._exceptions import (
     FormatConflictError,
     FormatError,
+    FormatResolutionError,
     ParseError,
     UnknownFormatError,
 )
+from mountainash_files.formats._protocols import FormatParser, FormatSerialiser
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec, ParseResult
 from mountainash_files.specs.archive import GzipCompression, ZipArchive
@@ -34,9 +36,12 @@ __all__ = [
     "GzipCompression",
     "ZipArchive",
     "FormatError",
+    "FormatParser",
+    "FormatSerialiser",
     "UnknownFormatError",
     "ParseError",
     "FormatConflictError",
+    "FormatResolutionError",
     "WriteError",
     "MissingDependencyError",
 ]

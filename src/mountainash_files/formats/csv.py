@@ -16,6 +16,7 @@ from mountainash_files.formats._types import FormatSpec
 class CsvSpec(FormatSpec):
     FORMAT: ClassVar[str] = "csv"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".csv",)
+    MEDIATYPES: ClassVar[tuple[str, ...]] = ("text/csv",)
 
     delimiter: str = ","
     encoding: str = "utf-8"

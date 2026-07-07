@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import io
+import logging
+import typing as t
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
@@ -16,6 +19,7 @@ from mountainash_files.formats._registry import (
     get_suffix_overrides,
     resolve_format,
 )
+from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._types import FormatSpec, ParseResult
 from mountainash_files.specs.base import FileSpec
 from mountainash_files.specs.sink import FileSinkSpec
@@ -24,6 +28,47 @@ from mountainash_files.specs.source import FileSourceSpec
 if TYPE_CHECKING:
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import StorageProfileProtocol
+
+_VALID_OUTPUTS = ("arrow", "pydata")
+_logger = logging.getLogger(__name__)
+
+
+def _check_output(output: str) -> None:
+    if output not in _VALID_OUTPUTS:
+        raise ValueError(f"output must be one of {_VALID_OUTPUTS}, got {output!r}")
+
+
+def _normalise_output(data: Any, output: str, spec: FormatSpec) -> Any:
+    """The single tabular-normalisation seam (rev-3 spec §1.3)."""
+    if not type(spec).TABULAR:
+        return data
+
+    import pyarrow as pa
+
+    if output == "arrow":
+        if isinstance(data, pa.Table):
+            return data
+        if isinstance(data, dict):
+            return pa.Table.from_pylist([data])
+        if isinstance(data, list):
+            if data and not all(isinstance(row, dict) for row in data):
+                raise ParseError(
+                    spec.FORMAT,
+                    "non-record JSON array is not tabular; expected an array "
+                    "of objects",
+                )
+            if data:
+                keys = list(dict.fromkeys(key for row in data for key in row))
+                data = [{key: row.get(key) for key in keys} for row in data]
+            return pa.Table.from_pylist(data)
+        raise ParseError(
+            spec.FORMAT,
+            f"payload type {type(data).__name__} is not normalisable to Arrow",
+        )
+
+    if isinstance(data, pa.Table):
+        return data.to_pylist()
+    return data
 
 
 def _resolve_profiles(
@@ -98,11 +143,13 @@ def parse(
     source: FileSourceSpec,
     *,
     params: dict[str, Any] | None = None,
+    output: t.Literal["arrow", "pydata"] = "arrow",
 ) -> list[ParseResult]:
     """Parse file(s) from a source spec.
 
     Always returns a list of ParseResult, even for single files.
     """
+    _check_output(output)
     path = source.path
     if params:
         path = path.format(**params)
@@ -130,7 +177,7 @@ def parse(
                 transforms=source.transforms,
                 on_missing=source.on_missing,
             )
-            results.extend(parse(child_source))
+            results.extend(parse(child_source, output=output))
         return results
 
     # Archive path: read raw bytes (no suffix inference — archive handles decompression),
@@ -148,7 +195,9 @@ def parse(
         from mountainash_files._archives import unpack_archive
 
         members = list(unpack_archive(raw, source.archive))
+        on_unrecognised = getattr(source.archive, "on_unrecognised", "error")
         results = []
+        skipped: list[str] = []
         for member_name, member_data in members:
             try:
                 if isinstance(source.format, FormatSpec):
@@ -163,11 +212,35 @@ def parse(
                 else:
                     fmt_key, ms = resolve_format(path=path)
                     fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
-            except Exception:
-                continue  # Skip members with unrecognised formats
+            except Exception as exc:
+                if on_unrecognised == "skip":
+                    skipped.append(member_name)
+                    _logger.warning(
+                        "Skipping archive member %r (unrecognised format): %s",
+                        member_name,
+                        exc,
+                    )
+                    continue
+                raise ParseError(
+                    "archive",
+                    f"member {member_name!r} in {path!r} has no resolvable "
+                    f"format ({exc}); scope members with file_pattern or set "
+                    "on_unrecognised='skip'",
+                ) from exc
             parser = get_parser(fmt_key)
-            result_data = parser(member_data, fmt_spec)
+            result_data = _normalise_output(parser(member_data, fmt_spec), output, fmt_spec)
             results.append(ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec))
+        if not results:
+            raise ParseError(
+                "archive",
+                f"archive {path!r} produced no recognised members "
+                f"(skipped: {skipped or 'none'})",
+            )
+        if skipped:
+            results = [
+                dataclasses.replace(result, skipped_members=tuple(skipped))
+                for result in results
+            ]
         return results
 
     # Non-archive: resolve format before IO — unknown suffix raises without touching the file.
@@ -192,12 +265,9 @@ def parse(
         raise
 
     parser = get_parser(format_key)
-    result_data = parser(data, spec)
+    result_data = _normalise_output(parser(data, spec), output, spec)
 
     return [ParseResult(data=result_data, format_key=format_key, spec=spec)]
-
-
-_APPENDABLE_FORMATS = frozenset({"parquet"})
 
 
 def write(
@@ -231,12 +301,8 @@ def write(
         overrides = get_suffix_overrides(matched_suffix)
         spec = get_spec_class(format_key)(**overrides)
 
-    # Check append support
-    if sink.write_disposition == "append" and format_key not in _APPENDABLE_FORMATS:
-        raise WriteError(
-            f"Format {format_key!r} does not support append. "
-            f"Appendable formats: {', '.join(sorted(_APPENDABLE_FORMATS))}"
-        )
+    if sink.write_disposition == "append" and not type(spec).APPENDABLE:
+        raise WriteError(f"Format {format_key!r} does not support append.")
 
     serialiser = get_serialiser(format_key)
     if serialiser is None:
@@ -322,18 +388,25 @@ def _resolve_format_spec(format: str | FormatSpec) -> tuple[str, FormatSpec]:
     return format_key, get_spec_class(format_key)(**overrides)
 
 
-def parse_bytes(data: bytes | BinaryIO, format: str | FormatSpec) -> ParseResult:
+def parse_bytes(
+    data: bytes | BinaryIO,
+    format: str | FormatSpec,
+    *,
+    output: t.Literal["arrow", "pydata"] = "arrow",
+) -> ParseResult:
     """Parse an in-memory buffer with an explicit format.
 
     The path-based :func:`parse` remains the primary entry; this exposes
     the format registry for bytes the caller already holds (HTTP bodies,
     message payloads, fixtures) without a fake temp path.
     """
+    _check_output(output)
     if not isinstance(data, bytes):
         data = data.read()
     format_key, spec = _resolve_format_spec(format)
     parser = get_parser(format_key)
-    return ParseResult(data=parser(data, spec), format_key=format_key, spec=spec)
+    result_data = _normalise_output(parser(data, spec), output, spec)
+    return ParseResult(data=result_data, format_key=format_key, spec=spec)
 
 
 def serialise_bytes(data: Any, format: str | FormatSpec) -> bytes:

@@ -31,15 +31,16 @@ class TestParseLocalFile:
         results = parse(source)
         assert len(results) == 1
         assert results[0].format_key == "json"
-        assert isinstance(results[0].data, dict)
+        assert isinstance(results[0].data, pa.Table)
+        assert results[0].data.num_rows == 1
 
     def test_ndjson_suffix_override(self):
         source = FileSourceSpec(path=str(FIXTURES / "sample.ndjson"))
         results = parse(source)
         assert len(results) == 1
         assert results[0].format_key == "json"
-        assert isinstance(results[0].data, list)
-        assert len(results[0].data) == 3
+        assert isinstance(results[0].data, pa.Table)
+        assert results[0].data.num_rows == 3
 
     def test_parquet_by_suffix(self):
         source = FileSourceSpec(path=str(FIXTURES / "sample.parquet"))
@@ -124,7 +125,7 @@ class TestParseWithArchive:
     def test_zip_all_parseable(self):
         source = FileSourceSpec(
             path=str(FIXTURES / "sample.zip"),
-            archive=ZipArchive(file_pattern="*"),
+            archive=ZipArchive(file_pattern="*", on_unrecognised="skip"),
         )
         results = parse(source)
         # Only CSV member is parseable (readme.txt has no registered format)

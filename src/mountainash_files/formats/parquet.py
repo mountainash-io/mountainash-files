@@ -16,6 +16,11 @@ from mountainash_files.formats._types import FormatSpec
 class ParquetSpec(FormatSpec):
     FORMAT: ClassVar[str] = "parquet"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".parquet", ".pq")
+    MEDIATYPES: ClassVar[tuple[str, ...]] = (
+        "application/vnd.apache.parquet",
+        "application/x-parquet",
+    )
+    APPENDABLE: ClassVar[bool] = True
 
     columns: tuple[str, ...] | None = None
 

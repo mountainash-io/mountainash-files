@@ -15,6 +15,9 @@ from mountainash_files.formats._types import FormatSpec
 class XlsxSpec(FormatSpec):
     FORMAT: ClassVar[str] = "xlsx"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".xlsx", ".xlsb")
+    MEDIATYPES: ClassVar[tuple[str, ...]] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
     sheet_name: str | int = 0
     skip_rows: int = 0

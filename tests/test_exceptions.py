@@ -36,6 +36,15 @@ def test_parse_error_carries_format_key():
     assert "malformed row 5" in str(err)
 
 
+def test_new_public_exports():
+    import mountainash_files as mf
+
+    assert callable(mf.parse)
+    for name in ("FormatParser", "FormatSerialiser", "FormatResolutionError"):
+        assert name in mf.__all__
+        assert hasattr(mf, name)
+
+
 class TestMissingDependencyError:
     def test_message_names_the_extra(self):
         err = MissingDependencyError("XLSX parsing", "xlsx")

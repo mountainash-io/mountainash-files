@@ -12,6 +12,7 @@ from mountainash_files.formats.csv import csv_parse
 class TsvSpec(FormatSpec):
     FORMAT: ClassVar[str] = "tsv"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".tsv", ".tab")
+    MEDIATYPES: ClassVar[tuple[str, ...]] = ("text/tab-separated-values",)
     delimiter: ClassVar[str] = "\t"
 
     encoding: str = "utf-8"

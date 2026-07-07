@@ -12,6 +12,8 @@ from mountainash_files.formats._types import FormatSpec
 class XmlSpec(FormatSpec):
     FORMAT: ClassVar[str] = "xml"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".xml",)
+    MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/xml", "text/xml")
+    TABULAR: ClassVar[bool] = False
 
     xpath: str | None = None
     encoding: str | None = None
