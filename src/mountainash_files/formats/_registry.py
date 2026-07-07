@@ -1,80 +1,189 @@
 from __future__ import annotations
 
+import importlib
+import importlib.metadata
+import logging
+import threading
 import typing as t
 from pathlib import PurePosixPath
 
-from mountainash_files.formats._exceptions import FormatConflictError, UnknownFormatError
+from mountainash_files.formats._exceptions import (
+    FormatConflictError,
+    FormatResolutionError,
+    UnknownFormatError,
+)
 from mountainash_files.formats._types import FormatSpec
+
+_logger = logging.getLogger(__name__)
 
 TRANSFORM_SUFFIXES: frozenset[str] = frozenset({
     ".gz", ".gzip", ".bz2", ".zst", ".lz4", ".xz",
     ".gpg", ".pgp", ".asc", ".age",
 })
 
-_SPECS: dict[str, type[FormatSpec]] = {}
-_PARSERS: dict[str, t.Callable] = {}
-_SERIALISERS: dict[str, t.Callable | None] = {}
+_LOCK = threading.RLock()
+
+_SPECS: dict[str, type[FormatSpec] | str] = {}
+_PARSERS: dict[str, t.Callable | str] = {}
+_SERIALISERS: dict[str, t.Callable | str | None] = {}
 _SUFFIX_MAP: dict[str, str] = {}
+_MEDIATYPE_MAP: dict[str, str] = {}
 _SUFFIX_OVERRIDES: dict[str, dict[str, t.Any]] = {}
+_FAILED_ENTRYPOINTS: dict[str, Exception] = {}
+_DISCOVERY_DONE: bool = False
 
 
 def _reset_registry() -> None:
-    """Clear all registrations. For testing only."""
-    _SPECS.clear()
-    _PARSERS.clear()
-    _SERIALISERS.clear()
-    _SUFFIX_MAP.clear()
-    _SUFFIX_OVERRIDES.clear()
+    """Clear all registrations and the discovery latch. For testing only."""
+    global _DISCOVERY_DONE
+    with _LOCK:
+        _SPECS.clear()
+        _PARSERS.clear()
+        _SERIALISERS.clear()
+        _SUFFIX_MAP.clear()
+        _MEDIATYPE_MAP.clear()
+        _SUFFIX_OVERRIDES.clear()
+        _FAILED_ENTRYPOINTS.clear()
+        _DISCOVERY_DONE = False
+
+
+def _validate_dotted(ref: str, what: str) -> None:
+    if ref.count(":") != 1 or not all(ref.split(":")):
+        raise ValueError(
+            f"{what} must be a dotted path of the form 'package.module:attr', "
+            f"got {ref!r}"
+        )
 
 
 def register_format(
-    spec_cls: type[FormatSpec],
-    parser: t.Callable,
+    spec_cls: type[FormatSpec] | str,
+    parser: t.Callable | str,
     *,
-    serialiser: t.Callable | None = None,
+    format_key: str | None = None,
+    suffixes: tuple[str, ...] | None = None,
+    mediatypes: tuple[str, ...] | None = None,
+    serialiser: t.Callable | str | None = None,
     suffix_overrides: dict[str, dict[str, t.Any]] | None = None,
     override: bool = False,
 ) -> None:
-    key = spec_cls.FORMAT
-    if key in _SPECS and not override:
-        raise FormatConflictError(
-            f"Format {key!r} already registered by {_SPECS[key].__name__}. "
-            "Pass override=True to replace."
-        )
-    if key in _SPECS and override:
-        for old_suffix in _SPECS[key].SUFFIXES:
-            s = old_suffix.lower()
-            if _SUFFIX_MAP.get(s) == key:
-                del _SUFFIX_MAP[s]
+    lazy = isinstance(spec_cls, str)
+    if lazy:
+        _validate_dotted(spec_cls, "spec_cls")
+        if format_key is None:
+            raise ValueError("format_key is required for lazy (string) registrations")
+        if suffixes is None:
+            raise ValueError("suffixes is required for lazy (string) registrations")
+        key = format_key
+        sfx = suffixes
+        mts = mediatypes or ()
+    else:
+        key = format_key if format_key is not None else spec_cls.FORMAT
+        sfx = suffixes if suffixes is not None else spec_cls.SUFFIXES
+        mts = mediatypes if mediatypes is not None else spec_cls.MEDIATYPES
 
-    _SPECS[key] = spec_cls
-    _PARSERS[key] = parser
-    _SERIALISERS[key] = serialiser
-    for suffix in spec_cls.SUFFIXES:
-        _SUFFIX_MAP[suffix.lower()] = key
-    if suffix_overrides:
-        for suffix, overrides in suffix_overrides.items():
-            _SUFFIX_OVERRIDES[suffix.lower()] = overrides
+    if isinstance(parser, str):
+        _validate_dotted(parser, "parser")
+    if isinstance(serialiser, str):
+        _validate_dotted(serialiser, "serialiser")
+
+    if key != key.lower():
+        raise ValueError(f"Format keys must be lowercase, got {key!r}")
+
+    normalised_suffixes = []
+    for suffix in sfx:
+        if not suffix.startswith(".") or len(suffix) < 2:
+            raise ValueError(
+                f"Invalid suffix {suffix!r}: must start with '.' and be non-empty"
+            )
+        normalised_suffixes.append(suffix.lower())
+    sfx = tuple(normalised_suffixes)
+    mts = tuple(mediatype.lower() for mediatype in mts)
+
+    with _LOCK:
+        if key in _SPECS and not override:
+            raise FormatConflictError(
+                f"Format {key!r} already registered. Pass override=True to replace."
+            )
+        for suffix in sfx:
+            owner = _SUFFIX_MAP.get(suffix)
+            if owner is not None and owner != key and not override:
+                raise FormatConflictError(
+                    f"Suffix {suffix!r} already owned by format {owner!r}. "
+                    "Pass override=True to replace."
+                )
+        for mediatype in mts:
+            owner = _MEDIATYPE_MAP.get(mediatype)
+            if owner is not None and owner != key and not override:
+                raise FormatConflictError(
+                    f"Mediatype {mediatype!r} already owned by format {owner!r}. "
+                    "Pass override=True to replace."
+                )
+
+        if key in _SPECS and override:
+            for suffix in [s for s, owner in _SUFFIX_MAP.items() if owner == key]:
+                del _SUFFIX_MAP[suffix]
+            for mediatype in [m for m, owner in _MEDIATYPE_MAP.items() if owner == key]:
+                del _MEDIATYPE_MAP[mediatype]
+
+        _SPECS[key] = spec_cls
+        _PARSERS[key] = parser
+        _SERIALISERS[key] = serialiser
+        for suffix in sfx:
+            _SUFFIX_MAP[suffix] = key
+        for mediatype in mts:
+            _MEDIATYPE_MAP[mediatype] = key
+        if suffix_overrides:
+            for suffix, overrides in suffix_overrides.items():
+                _SUFFIX_OVERRIDES[suffix.lower()] = overrides
+
+
+def _strip_mediatype(mediatype: str) -> str:
+    return mediatype.split(";")[0].strip().lower()
+
+
+def _raise_unknown(*, path: str | None) -> t.NoReturn:
+    raise UnknownFormatError(
+        path=path,
+        known_suffixes=tuple(_SUFFIX_MAP.keys()),
+        failed_plugins=tuple(sorted(_FAILED_ENTRYPOINTS)),
+        failures=dict(_FAILED_ENTRYPOINTS),
+    )
 
 
 def resolve_format(
     path: str | None = None,
     format: str | None = None,
+    mediatype: str | None = None,
 ) -> tuple[str, str | None]:
-    if format is not None:
-        fmt = format.lower()
-        if fmt not in _SPECS:
-            raise UnknownFormatError(path=None, known_suffixes=tuple(_SUFFIX_MAP.keys()))
-        return fmt, None
-    if path is not None:
-        for suffix in reversed(PurePosixPath(path).suffixes):
-            s = suffix.lower()
-            if s in TRANSFORM_SUFFIXES:
-                continue
-            fmt = _SUFFIX_MAP.get(s)
-            if fmt is not None:
-                return fmt, s
-    raise UnknownFormatError(path=path, known_suffixes=tuple(_SUFFIX_MAP.keys()))
+    """Resolve a format key. Precedence: explicit format -> mediatype -> suffix."""
+    with _LOCK:
+        if format is not None:
+            fmt = format.lower()
+            if fmt not in _SPECS:
+                _raise_unknown(path=None)
+            return fmt, None
+
+        if mediatype is not None:
+            mt = _strip_mediatype(mediatype)
+            key = _MEDIATYPE_MAP.get(mt)
+            if key is not None:
+                return key, None
+            if "+" in mt and "/" in mt:
+                base = mt.split("/")[0] + "/" + mt.rsplit("+", 1)[1]
+                key = _MEDIATYPE_MAP.get(base)
+                if key is not None:
+                    return key, None
+
+        if path is not None:
+            for suffix in reversed(PurePosixPath(path).suffixes):
+                s = suffix.lower()
+                if s in TRANSFORM_SUFFIXES:
+                    continue
+                fmt = _SUFFIX_MAP.get(s)
+                if fmt is not None:
+                    return fmt, s
+
+        _raise_unknown(path=path)
 
 
 def get_suffix_overrides(suffix: str | None) -> dict[str, t.Any]:
@@ -83,13 +192,73 @@ def get_suffix_overrides(suffix: str | None) -> dict[str, t.Any]:
     return _SUFFIX_OVERRIDES.get(suffix, {})
 
 
+def _resolve(ref: str, format_key: str, field: str) -> t.Any:
+    module_path, attr_name = ref.rsplit(":", 1)
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, attr_name)
+    except (ImportError, AttributeError) as exc:
+        raise FormatResolutionError(format_key=format_key, ref=ref, field=field) from exc
+
+
 def get_parser(format_key: str) -> t.Callable:
-    return _PARSERS[format_key]
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _PARSERS:
+            _raise_unknown(path=None)
+        ref = _PARSERS[key]
+        if isinstance(ref, str):
+            resolved = _resolve(ref, key, "parser")
+            _PARSERS[key] = resolved
+            return resolved
+        return ref
 
 
 def get_spec_class(format_key: str) -> type[FormatSpec]:
-    return _SPECS[format_key]
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _SPECS:
+            _raise_unknown(path=None)
+        ref = _SPECS[key]
+        if isinstance(ref, str):
+            resolved = _resolve(ref, key, "spec_cls")
+            _SPECS[key] = resolved
+            return resolved
+        return ref
 
 
 def get_serialiser(format_key: str) -> t.Callable | None:
-    return _SERIALISERS.get(format_key)
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _SERIALISERS:
+            _raise_unknown(path=None)
+        ref = _SERIALISERS[key]
+        if isinstance(ref, str):
+            resolved = _resolve(ref, key, "serialiser")
+            _SERIALISERS[key] = resolved
+            return resolved
+        return ref
+
+
+def _discover_entrypoint_formats() -> None:
+    """Import all modules in the mountainash_files.formats entry-point group."""
+    global _DISCOVERY_DONE
+    with _LOCK:
+        if _DISCOVERY_DONE:
+            return
+        _DISCOVERY_DONE = True
+        try:
+            eps = importlib.metadata.entry_points(group="mountainash_files.formats")
+        except TypeError:  # pragma: no cover - Python <3.10 compat shape
+            eps = importlib.metadata.entry_points().get("mountainash_files.formats", [])
+        for ep in sorted(eps, key=lambda e: (e.group, e.name, e.value)):
+            try:
+                ep.load()
+            except Exception as exc:
+                _FAILED_ENTRYPOINTS[ep.name] = exc
+                _logger.warning(
+                    "Failed to load format plugin %r from %s",
+                    ep.name,
+                    ep.value,
+                    exc_info=True,
+                )

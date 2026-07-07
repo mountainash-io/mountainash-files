@@ -8,13 +8,28 @@ class FormatError(Exception):
 class UnknownFormatError(FormatError):
     """Format cannot be determined. Carries known_suffixes for remediation."""
 
-    def __init__(self, *, path: str | None, known_suffixes: tuple[str, ...]):
+    def __init__(
+        self,
+        *,
+        path: str | None,
+        known_suffixes: tuple[str, ...],
+        failed_plugins: tuple[str, ...] = (),
+        failures: dict[str, Exception] | None = None,
+    ):
         self.path = path
         self.known_suffixes = known_suffixes
-        super().__init__(
+        self.failed_plugins = failed_plugins
+        msg = (
             f"Cannot determine format from path={path!r}. "
             f"Known suffixes: {', '.join(known_suffixes)}."
         )
+        if failed_plugins:
+            details = "; ".join(
+                f"{name}: {type(exc).__name__}: {exc}"
+                for name, exc in sorted((failures or {}).items())
+            )
+            msg += f" Note: format plugin(s) failed to load — {details}"
+        super().__init__(msg)
 
 
 class ParseError(FormatError):
