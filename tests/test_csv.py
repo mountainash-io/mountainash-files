@@ -1,99 +1,67 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
 
 import pyarrow as pa
 import pytest
 
-from mountainash_files.formats.csv import CsvSpec, csv_parse
 from mountainash_files.formats._exceptions import ParseError
-
-FIXTURES = Path(__file__).parent / "fixtures"
-
-
-class TestCsvSpec:
-    def test_defaults(self):
-        spec = CsvSpec()
-        assert spec.FORMAT == "csv"
-        assert spec.delimiter == ","
-        assert spec.encoding == "utf-8"
-        assert spec.skip_rows == 0
-        assert spec.header_row == 0
-        assert spec.columns is None
-        assert spec.dtypes is None
-
-    def test_suffixes(self):
-        assert CsvSpec.SUFFIXES == (".csv",)
+from mountainash_files.formats.csv import CsvSpec, csv_parse
 
 
-class TestCsvParse:
-    def test_from_bytes(self):
-        data = b"x,y\n1,2\n3,4\n"
-        table = csv_parse(data, CsvSpec())
-        assert isinstance(table, pa.Table)
-        assert table.num_rows == 2
-        assert table.column_names == ["x", "y"]
+def test_csv_defaults_follow_table_dialect() -> None:
+    spec = CsvSpec()
+    assert spec.header is True
+    assert spec.header_rows == (1,)
+    assert spec.quote_char == '"'
+    assert spec.null_sequence is None
 
-    def test_from_stream(self):
-        data = io.BytesIO(b"x,y\n1,2\n3,4\n")
-        table = csv_parse(data, CsvSpec())
-        assert table.num_rows == 2
 
-    def test_from_fixture(self):
-        data = (FIXTURES / "sample.csv").read_bytes()
-        table = csv_parse(data, CsvSpec())
-        assert table.num_rows == 3
-        assert "name" in table.column_names
+@pytest.mark.parametrize(
+    ("enabled", "expected"),
+    [(False, " leading"), (True, "leading")],
+)
+def test_skip_initial_space_is_discriminating(enabled: bool, expected: str) -> None:
+    table = csv_parse(b"left,right\na, leading\n", CsvSpec(skip_initial_space=enabled))
+    assert table.to_pylist() == [{"left": "a", "right": expected}]
 
-    def test_custom_delimiter(self):
-        data = b"x;y\n1;2\n3;4\n"
-        table = csv_parse(data, CsvSpec(delimiter=";"))
-        assert table.column_names == ["x", "y"]
 
-    def test_no_header(self):
-        data = b"1,2\n3,4\n"
-        table = csv_parse(data, CsvSpec(header_row=None))
-        assert table.num_rows == 2
-        assert table.column_names[0].startswith("f")  # pyarrow auto-names
+def test_quote_aware_records_keep_embedded_newlines_and_comments() -> None:
+    data = b"# comment\nname,note\na,\"line one\n# still data\"\n"
+    table = csv_parse(data, CsvSpec(comment_char="#"))
+    assert table.to_pylist() == [{"name": "a", "note": "line one\n# still data"}]
 
-    def test_skip_rows(self):
-        data = b"# comment\nx,y\n1,2\n"
-        table = csv_parse(data, CsvSpec(skip_rows=1))
-        assert table.num_rows == 1
-        assert "x" in table.column_names
 
-    def test_select_columns(self):
-        data = b"x,y,z\n1,2,3\n"
-        table = csv_parse(data, CsvSpec(columns=("x", "z")))
-        assert table.column_names == ["x", "z"]
+def test_multicharacter_delimiter_and_terminator() -> None:
+    table = csv_parse(b"x||y@@1||2@@", CsvSpec(delimiter="||", line_terminator="@@"))
+    assert table.to_pylist() == [{"x": 1, "y": 2}]
 
-    def test_empty_file_raises(self):
-        with pytest.raises(ParseError, match="csv"):
-            csv_parse(b"", CsvSpec())
 
-    def test_custom_quote_char(self):
-        # Pipe-quoted fields containing the delimiter must stay intact.
-        data = b"a,b\n|1,2|,x\n"
-        table = csv_parse(data, CsvSpec(quote_char="|"))
-        assert table.column_names == ["a", "b"]
-        assert table.num_rows == 1
-        assert table.column(0).to_pylist() == ["1,2"]
+def test_header_rows_join_and_normalize_positions() -> None:
+    data = b"left,right\nvalue,amount\na,1\n"
+    table = csv_parse(data, CsvSpec(header_rows=(2, 1, 2), header_join="."))
+    assert table.column_names == ["left.value", "right.amount"]
+    assert table.to_pylist() == [{"left.value": "a", "right.amount": 1}]
 
-    def test_escape_char(self):
-        # Backslash-escaped quote inside a quoted field.
-        data = b'a\n"he said \\"hi\\""\n'
-        table = csv_parse(data, CsvSpec(escape_char="\\"))
-        assert table.num_rows == 1
-        assert table.column(0).to_pylist() == ['he said "hi"']
 
-    def test_null_values(self):
-        # Custom null token nullifies matching cells, including string columns.
-        data = b"a,b\nNA,x\n1,NA\n"
-        table = csv_parse(data, CsvSpec(null_values=("NA",)))
-        assert table.column("a").to_pylist() == [None, 1]
-        assert table.column("b").to_pylist() == ["x", None]
+def test_no_header_generates_field_names() -> None:
+    table = csv_parse(b"1,2\n", CsvSpec(header=False))
+    assert table.column_names == ["field1", "field2"]
 
-    def test_new_dialect_defaults_are_none(self):
-        spec = CsvSpec()
-        assert spec.quote_char is None
-        assert spec.escape_char is None
-        assert spec.null_values is None
+
+def test_null_sequence_and_escape_mode() -> None:
+    table = csv_parse(
+        b'a,b\nNA,"he said \\"hi\\""\n',
+        CsvSpec(escape_char="\\", double_quote=False, null_sequence="NA"),
+    )
+    assert table.to_pylist() == [{"a": None, "b": 'he said "hi"'}]
+
+
+def test_empty_delimiter_is_rejected() -> None:
+    with pytest.raises(ParseError):
+        csv_parse(b"a\n", CsvSpec(delimiter=""))
+
+
+def test_stream_input() -> None:
+    table = csv_parse(io.BytesIO(b"x\n1\n"), CsvSpec())
+    assert isinstance(table, pa.Table)

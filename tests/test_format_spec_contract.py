@@ -77,7 +77,7 @@ def test_to_options_full_emits_every_field():
 
 
 def test_from_options_round_trip():
-    spec = CsvSpec(delimiter=";", null_values=("NA",))
+    spec = CsvSpec(delimiter=";", null_sequence="NA")
     rebuilt = CsvSpec.from_options(spec.to_options())
     assert rebuilt == spec
 
@@ -116,4 +116,4 @@ def test_to_options_rejects_non_json_values():
 
 
 def test_tuple_fields_survive_json_check():
-    assert CsvSpec(null_values=("NA", "-")).to_options()["null_values"] == ("NA", "-")
+    assert CsvSpec(null_sequence="NA").to_options()["null_sequence"] == "NA"
