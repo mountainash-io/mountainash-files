@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import dataclasses
 import io
+import re
 from typing import BinaryIO, ClassVar
 
 import pyarrow as pa
-import pyarrow.csv as pcsv
 
+from mountainash_files.formats._delimited import (
+    remove_comment_records,
+    scan_logical_records,
+    tokenize_record,
+)
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
+from mountainash_files.formats._rows import apply_header_plan
 from mountainash_files.formats._types import FormatSpec
 from mountainash_resource_provider import ProviderFormatDescriptor
 
@@ -31,92 +37,87 @@ class CsvSpec(FormatSpec):
     )
 
     delimiter: str = ","
+    line_terminator: str = "\n"
+    quote_char: str | None = '"'
+    double_quote: bool = True
+    escape_char: str | None = None
+    null_sequence: str | None = None
+    skip_initial_space: bool = False
+    header: bool = True
+    header_rows: tuple[int, ...] = (1,)
+    header_join: str = " "
+    comment_char: str | None = None
+    comment_rows: tuple[int, ...] = ()
     encoding: str = "utf-8"
-    skip_rows: int = 0
-    header_row: int | None = 0
     columns: tuple[str, ...] | None = None
     dtypes: tuple[tuple[str, str], ...] | None = None
-    quote_char: str | None = None
-    escape_char: str | None = None
-    null_values: tuple[str, ...] | None = None
 
 
 def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
     if isinstance(data, bytes):
-        if len(data) == 0:
-            raise ParseError("csv", "Empty input")
-        stream: BinaryIO = io.BytesIO(data)
+        raw = data
     else:
-        stream = data
-
-    total_skip = spec.skip_rows
-    if spec.header_row is not None and spec.header_row > 0:
-        total_skip += spec.header_row
-
-    read_options = pcsv.ReadOptions(
-        skip_rows=total_skip,
-        autogenerate_column_names=(spec.header_row is None),
-        encoding=spec.encoding,
-    )
-    # Read dialect options defensively: csv_parse is shared by CsvSpec and
-    # TsvSpec (and any future delimited-text spec), which need not all declare
-    # every field.
-    quote_char = getattr(spec, "quote_char", None)
-    escape_char = getattr(spec, "escape_char", None)
-    null_values = getattr(spec, "null_values", None)
-
-    parse_kwargs: dict = {"delimiter": spec.delimiter}
-    if quote_char is not None:
-        parse_kwargs["quote_char"] = quote_char
-    if escape_char is not None:
-        parse_kwargs["escape_char"] = escape_char
-    parse_options = pcsv.ParseOptions(**parse_kwargs)
-
-    convert_kwargs: dict = {}
-    if spec.dtypes is not None:
-        convert_kwargs["column_types"] = {
-            name: pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes
-        }
-    if null_values is not None:
-        # Custom null tokens replace pyarrow's defaults; strings_can_be_null lets
-        # them nullify string columns too (matches Frictionless nullSequence).
-        convert_kwargs["null_values"] = list(null_values)
-        convert_kwargs["strings_can_be_null"] = True
-    convert_options = pcsv.ConvertOptions(**convert_kwargs) if convert_kwargs else None
-
+        raw = data.read()
+    if not raw:
+        raise ParseError("csv", "Empty input")
     try:
-        table = pcsv.read_csv(
-            stream,
-            read_options=read_options,
-            parse_options=parse_options,
-            convert_options=convert_options,
-        )
+        text = raw.decode(spec.encoding)
+    except UnicodeDecodeError as exc:
+        raise ParseError("csv", str(exc)) from exc
+    records = remove_comment_records(scan_logical_records(text, spec), spec)
+    rows = tuple(tokenize_record(record, spec) for record in records if record != "")
+    labels, values = apply_header_plan(rows, spec.header, spec.header_rows, spec.header_join)
+    arrays = {
+        label: _infer_values([row[index] for row in values])
+        for index, label in enumerate(labels)
+    }
+    try:
+        table = pa.table(arrays)
     except Exception as exc:
         raise ParseError("csv", str(exc)) from exc
-
+    if spec.dtypes is not None:
+        table = table.cast(
+            pa.schema([pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes])
+        )
     if spec.columns is not None:
         table = table.select(list(spec.columns))
-
     return table
 
 
+_INTEGER = re.compile(r"[+-]?\d+\Z")
+_FLOAT = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][+-]?\d+)?\Z")
+
+
+def _infer_values(values: list[str | None]) -> list[str | int | float | None]:
+    non_null = [value for value in values if value is not None]
+    if non_null and all(_INTEGER.fullmatch(value) for value in non_null):
+        return [None if value is None else int(value) for value in values]
+    if non_null and all(_FLOAT.fullmatch(value) for value in non_null):
+        return [None if value is None else float(value) for value in values]
+    return values
+
+
 def _resolve_type(dtype_str: str) -> pa.DataType:
-    _TYPE_MAP = {
+    return {
         "string": pa.string(),
         "int64": pa.int64(),
         "int32": pa.int32(),
         "float64": pa.float64(),
         "float32": pa.float32(),
         "bool": pa.bool_(),
-    }
-    return _TYPE_MAP.get(dtype_str, pa.string())
+    }.get(dtype_str, pa.string())
 
 
 def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
-    buf = io.BytesIO()
-    write_options = pcsv.WriteOptions(delimiter=spec.delimiter)
-    pcsv.write_csv(data, buf, write_options=write_options)
-    return buf.getvalue()
+    output = io.StringIO()
+    if spec.header:
+        output.write(spec.delimiter.join(data.column_names) + spec.line_terminator)
+    for row in data.to_pylist():
+        output.write(
+            spec.delimiter.join("" if row[name] is None else str(row[name]) for name in data.column_names)
+            + spec.line_terminator
+        )
+    return output.getvalue().encode(spec.encoding)
 
 
 register_format(CsvSpec, csv_parse, serialiser=csv_serialise)
