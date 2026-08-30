@@ -10,6 +10,7 @@ import pyarrow.csv as pcsv
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
+from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -17,6 +18,17 @@ class CsvSpec(FormatSpec):
     FORMAT: ClassVar[str] = "csv"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".csv",)
     MEDIATYPES: ClassVar[tuple[str, ...]] = ("text/csv",)
+    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
+        ProviderFormatDescriptor(
+            canonical_format="csv",
+            aliases=frozenset(),
+            suffixes=frozenset({".csv"}),
+            mediatypes=frozenset({"text/csv"}),
+            locator_prefixes=frozenset(),
+            dialect_family="delimited",
+            provider_format_key="csv",
+        ),
+    )
 
     delimiter: str = ","
     encoding: str = "utf-8"

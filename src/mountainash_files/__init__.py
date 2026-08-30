@@ -16,6 +16,7 @@ from mountainash_files.specs.archive import GzipCompression, ZipArchive
 from mountainash_files.specs.base import FileSpec
 from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
+from mountainash_files.provider import FileProviderReadPlan, FileResourceProvider
 
 # Trigger built-in format registration
 import mountainash_files.formats  # noqa: F401
@@ -44,4 +45,6 @@ __all__ = [
     "FormatResolutionError",
     "WriteError",
     "MissingDependencyError",
+    "FileProviderReadPlan",
+    "FileResourceProvider",
 ]
