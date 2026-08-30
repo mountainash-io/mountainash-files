@@ -114,15 +114,26 @@ class FileResourceProvider:
             raise ProviderReadError(f"could not read file resource {locator!r}") from exc
         if not isinstance(parsed.data, pa.Table):
             raise ProviderReadError("file parser did not produce an Arrow table")
-        if any(
+        deferred = any(
             value is DialectFieldDisposition.DEFERRED
             for value in plan.dialect_fields.values()
-        ):
-            raise ProviderReadError("structured dialect fields require source-shape resolution")
+        )
+        resolved_context: dict[str, str] = {}
+        dialect_fields = dict(plan.dialect_fields)
+        if deferred:
+            item_type = plan.payload["dialect"].get("item_type")
+            shape = item_type if item_type in {"object", "array"} else "object"
+            resolved_context["structured_row_shape"] = shape
+            dialect_fields = {
+                key: DialectFieldDisposition.CONSUMED
+                if value is DialectFieldDisposition.DEFERRED
+                else value
+                for key, value in dialect_fields.items()
+            }
         return ProviderReadResult(
             table=parsed.data,
-            resolved_context={},
-            dialect_fields=plan.dialect_fields,
+            resolved_context=resolved_context,
+            dialect_fields=dialect_fields,
         )
 
     def native_request(
