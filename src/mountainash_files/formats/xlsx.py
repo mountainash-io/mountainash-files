@@ -9,6 +9,7 @@ import pyarrow as pa
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
+from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -17,6 +18,46 @@ class XlsxSpec(FormatSpec):
     SUFFIXES: ClassVar[tuple[str, ...]] = (".xlsx", ".xlsb")
     MEDIATYPES: ClassVar[tuple[str, ...]] = (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
+        ProviderFormatDescriptor(
+            canonical_format="xlsx",
+            aliases=frozenset(),
+            suffixes=frozenset({".xlsx"}),
+            mediatypes=frozenset(
+                {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+            ),
+            locator_prefixes=frozenset(),
+            dialect_family="spreadsheet",
+            provider_format_key="xlsx",
+        ),
+        ProviderFormatDescriptor(
+            canonical_format="xlsm",
+            aliases=frozenset(),
+            suffixes=frozenset({".xlsm"}),
+            mediatypes=frozenset({"application/vnd.ms-excel.sheet.macroenabled.12"}),
+            locator_prefixes=frozenset(),
+            dialect_family="spreadsheet",
+            provider_format_key="xlsx",
+        ),
+        ProviderFormatDescriptor(
+            canonical_format="xlsb",
+            aliases=frozenset(),
+            suffixes=frozenset({".xlsb"}),
+            mediatypes=frozenset({"application/vnd.ms-excel.sheet.binary.macroenabled.12"}),
+            locator_prefixes=frozenset(),
+            dialect_family="spreadsheet",
+            provider_format_key="xlsx",
+        ),
+        ProviderFormatDescriptor(
+            canonical_format="ods",
+            aliases=frozenset(),
+            suffixes=frozenset({".ods"}),
+            mediatypes=frozenset({"application/vnd.oasis.opendocument.spreadsheet"}),
+            locator_prefixes=frozenset(),
+            dialect_family="spreadsheet",
+            provider_format_key="xlsx",
+        ),
     )
 
     sheet_name: str | int = 0

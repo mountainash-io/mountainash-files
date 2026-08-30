@@ -7,6 +7,7 @@ from typing import BinaryIO, ClassVar
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
+from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -16,6 +17,35 @@ class JsonSpec(FormatSpec):
     MEDIATYPES: ClassVar[tuple[str, ...]] = (
         "application/json",
         "application/x-ndjson",
+    )
+    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
+        ProviderFormatDescriptor(
+            canonical_format="json",
+            aliases=frozenset(),
+            suffixes=frozenset({".json"}),
+            mediatypes=frozenset({"application/json"}),
+            locator_prefixes=frozenset(),
+            dialect_family="structured",
+            provider_format_key="json",
+        ),
+        ProviderFormatDescriptor(
+            canonical_format="ndjson",
+            aliases=frozenset({"jsonl"}),
+            suffixes=frozenset({".ndjson", ".jsonl"}),
+            mediatypes=frozenset({"application/ndjson", "application/x-ndjson"}),
+            locator_prefixes=frozenset(),
+            dialect_family="structured",
+            provider_format_key="json",
+        ),
+        ProviderFormatDescriptor(
+            canonical_format="geojson",
+            aliases=frozenset(),
+            suffixes=frozenset({".geojson"}),
+            mediatypes=frozenset({"application/geo+json"}),
+            locator_prefixes=frozenset(),
+            dialect_family="structured",
+            provider_format_key="json",
+        ),
     )
 
     records_path: str | None = None
