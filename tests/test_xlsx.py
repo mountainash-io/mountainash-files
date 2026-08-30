@@ -1,47 +1,38 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import pyarrow as pa
 import pytest
 
-from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
 from mountainash_files.formats._exceptions import ParseError
+from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-class TestXlsxSpec:
-    def test_defaults(self):
-        spec = XlsxSpec()
-        assert spec.FORMAT == "xlsx"
-        assert spec.sheet_name == 0
-        assert spec.skip_rows == 0
-        assert spec.header_row == 0
-        assert spec.engine == "auto"
-
-    def test_suffixes(self):
-        assert ".xlsx" in XlsxSpec.SUFFIXES
-        assert ".xlsb" in XlsxSpec.SUFFIXES
+def test_xlsx_defaults_follow_table_dialect() -> None:
+    spec = XlsxSpec()
+    assert spec.sheet_name is None
+    assert spec.sheet_number is None
+    assert spec.header_rows == (1,)
+    assert spec.header is True
 
 
-class TestXlsxParse:
-    def test_from_fixture(self):
-        path = FIXTURES / "sample.xlsx"
-        if not path.exists():
-            pytest.skip("XLSX fixture not created")
-        data = path.read_bytes()
-        table = xlsx_parse(data, XlsxSpec())
-        assert isinstance(table, pa.Table)
-        assert table.num_rows == 3
+def test_xlsx_header_controls_and_sheet_name() -> None:
+    data = (FIXTURES / "sample.xlsx").read_bytes()
+    table = xlsx_parse(data, XlsxSpec(sheet_number=1, header=True, header_rows=(1,)))
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 3
 
-    def test_empty_raises(self):
-        with pytest.raises((ParseError, ImportError)):
-            xlsx_parse(b"", XlsxSpec())
 
-    def test_engine_openpyxl(self):
-        path = FIXTURES / "sample.xlsx"
-        if not path.exists():
-            pytest.skip("XLSX fixture not created")
-        data = path.read_bytes()
-        table = xlsx_parse(data, XlsxSpec(engine="openpyxl"))
-        assert isinstance(table, pa.Table)
-        assert table.num_rows == 3
+def test_xlsx_rejects_conflicting_sheet_selectors() -> None:
+    data = (FIXTURES / "sample.xlsx").read_bytes()
+    with pytest.raises(ParseError):
+        xlsx_parse(data, XlsxSpec(sheet_name="Sheet1", sheet_number=1))
+
+
+def test_xlsx_empty_sheet_name_is_a_provider_error() -> None:
+    data = (FIXTURES / "sample.xlsx").read_bytes()
+    with pytest.raises(ParseError):
+        xlsx_parse(data, XlsxSpec(sheet_name=""))

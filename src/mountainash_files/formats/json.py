@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 import json as _json
-from typing import BinaryIO, ClassVar
+from typing import BinaryIO, ClassVar, Literal
+
+import pyarrow as pa
 
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
@@ -13,107 +15,68 @@ from mountainash_resource_provider import ProviderFormatDescriptor
 @dataclasses.dataclass(frozen=True)
 class JsonSpec(FormatSpec):
     FORMAT: ClassVar[str] = "json"
-    SUFFIXES: ClassVar[tuple[str, ...]] = (".json", ".ndjson", ".jsonl")
-    MEDIATYPES: ClassVar[tuple[str, ...]] = (
-        "application/json",
-        "application/x-ndjson",
-    )
+    SUFFIXES: ClassVar[tuple[str, ...]] = (".json", ".ndjson", ".jsonl", ".geojson")
+    MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/json", "application/x-ndjson")
     PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
-        ProviderFormatDescriptor(
-            canonical_format="json",
-            aliases=frozenset(),
-            suffixes=frozenset({".json"}),
-            mediatypes=frozenset({"application/json"}),
-            locator_prefixes=frozenset(),
-            dialect_family="structured",
-            provider_format_key="json",
-        ),
-        ProviderFormatDescriptor(
-            canonical_format="ndjson",
-            aliases=frozenset({"jsonl"}),
-            suffixes=frozenset({".ndjson", ".jsonl"}),
-            mediatypes=frozenset({"application/ndjson", "application/x-ndjson"}),
-            locator_prefixes=frozenset(),
-            dialect_family="structured",
-            provider_format_key="json",
-        ),
-        ProviderFormatDescriptor(
-            canonical_format="geojson",
-            aliases=frozenset(),
-            suffixes=frozenset({".geojson"}),
-            mediatypes=frozenset({"application/geo+json"}),
-            locator_prefixes=frozenset(),
-            dialect_family="structured",
-            provider_format_key="json",
-        ),
+        ProviderFormatDescriptor("json", frozenset(), frozenset({".json"}), frozenset({"application/json"}), frozenset(), "structured", "json"),
+        ProviderFormatDescriptor("ndjson", frozenset({"jsonl"}), frozenset({".ndjson", ".jsonl"}), frozenset({"application/ndjson", "application/x-ndjson"}), frozenset(), "structured", "json"),
+        ProviderFormatDescriptor("geojson", frozenset(), frozenset({".geojson"}), frozenset({"application/geo+json"}), frozenset(), "structured", "json"),
     )
-
-    records_path: str | None = None
+    property: str | None = None
+    item_type: Literal["object", "array"] | None = None
+    item_keys: tuple[str, ...] | None = None
+    header: bool = True
     ndjson: bool = False
-    empty_on_missing: bool = False
 
 
-def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> dict | list:
-    if hasattr(data, "read"):
-        raw = data.read()
-    else:
-        raw = data
-
-    if len(raw) == 0:
+def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> pa.Table | list[object]:
+    raw = data.read() if hasattr(data, "read") else data
+    if not raw:
         raise ParseError("json", "Empty input")
-
-    if spec.ndjson:
-        try:
-            return [_json.loads(line) for line in raw.splitlines() if line.strip()]
-        except (_json.JSONDecodeError, ValueError) as exc:
-            raise ParseError("json", str(exc)) from exc
-
     try:
-        parsed = _json.loads(raw)
+        source = [_json.loads(line) for line in raw.splitlines() if line.strip()] if spec.ndjson else _json.loads(raw)
     except (_json.JSONDecodeError, ValueError) as exc:
         raise ParseError("json", str(exc)) from exc
-
-    if spec.records_path is not None:
-        for key in spec.records_path.split("."):
-            if isinstance(parsed, dict):
-                if key not in parsed:
-                    if spec.empty_on_missing:
-                        # An absent records collection means zero records — mirror an
-                        # explicit empty list rather than erroring (e.g. an API page
-                        # that omits the records key when the window has no data).
-                        return []
-                    raise ParseError(
-                        "json",
-                        f"Key {key!r} not found at path {spec.records_path!r}",
-                    )
-                parsed = parsed[key]
-            else:
-                raise ParseError(
-                    "json",
-                    f"Expected dict at {key!r} in path {spec.records_path!r}, "
-                    f"got {type(parsed).__name__}",
-                )
-
-    return parsed
+    if spec.property not in (None, ""):
+        for key in spec.property.split("."):
+            if not isinstance(source, dict) or key not in source:
+                raise ParseError("json", f"property {spec.property!r} was not found")
+            source = source[key]
+    records = source if isinstance(source, list) else [source]
+    return _resolve_rows(records, spec)
 
 
-import pyarrow as pa  # noqa: E402
+def _resolve_rows(records: list[object], spec: JsonSpec) -> pa.Table | list[object]:
+    if not records:
+        return pa.table({})
+    shape = spec.item_type or (
+        "object" if isinstance(records[0], dict) else "array" if isinstance(records[0], list) else None
+    )
+    if shape is None:
+        return records
+    if any(not isinstance(row, dict if shape == "object" else list) for row in records):
+        raise ParseError("json", "mixed or unsupported structured row shapes")
+    if shape == "object":
+        keys = spec.item_keys or tuple(dict.fromkeys(key for row in records for key in row))
+        return pa.Table.from_pylist([{key: row.get(key) for key in keys} for row in records])
+    rows = records
+    width = len(rows[0])
+    if any(len(row) != width for row in rows):
+        raise ParseError("json", "array row widths differ")
+    if spec.header:
+        names = [str(value) if value not in (None, "") else f"field{index}" for index, value in enumerate(rows[0], 1)]
+        rows = rows[1:]
+    else:
+        names = [f"field{index}" for index in range(1, width + 1)]
+    return pa.table({name: [row[index] for row in rows] for index, name in enumerate(names)})
 
 
 def json_serialise(data: dict | list | pa.Table, spec: JsonSpec) -> bytes:
     if isinstance(data, pa.Table):
         data = data.to_pylist()
-
     if spec.ndjson and isinstance(data, list):
-        lines = [_json.dumps(item, default=str) for item in data]
-        return ("\n".join(lines) + "\n").encode("utf-8")
-
-    return _json.dumps(data, default=str, indent=2).encode("utf-8")
+        return ("\n".join(_json.dumps(item, default=str) for item in data) + "\n").encode()
+    return _json.dumps(data, default=str).encode()
 
 
-register_format(
-    JsonSpec,
-    json_parse,
-    serialiser=json_serialise,
-    suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
-)
+register_format(JsonSpec, json_parse, serialiser=json_serialise, suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}})
