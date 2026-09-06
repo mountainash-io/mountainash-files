@@ -25,8 +25,6 @@ dependencies = [
     "mountainash-transport>=26.7.0",
 ]
 
-[project.entry-points."mountainash.resource_providers"]
-file = "mountainash_files.provider:create_provider"
 
 [tool.uv.sources]
 mountainash-transport = { path = "../mountainash-transport" }

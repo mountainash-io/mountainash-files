@@ -32,7 +32,7 @@ def test_xlsx_rejects_conflicting_sheet_selectors() -> None:
         xlsx_parse(data, XlsxSpec(sheet_name="Sheet1", sheet_number=1))
 
 
-def test_xlsx_empty_sheet_name_is_a_provider_error() -> None:
+def test_xlsx_empty_sheet_name_is_parse_error() -> None:
     data = (FIXTURES / "sample.xlsx").read_bytes()
     with pytest.raises(ParseError):
         xlsx_parse(data, XlsxSpec(sheet_name=""))

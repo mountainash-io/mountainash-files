@@ -4,7 +4,6 @@ import dataclasses
 import json as _json
 import types
 from typing import Any, ClassVar, Union, get_args, get_origin, get_type_hints
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 class FormatSpec:
@@ -19,7 +18,6 @@ class FormatSpec:
     TABULAR: ClassVar[bool] = True
     COMPLEX_HANDLER_KEY: ClassVar[str | None] = None
     APPENDABLE: ClassVar[bool] = False
-    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = ()
 
     def to_options(self, *, full: bool = False) -> dict[str, Any]:
         options: dict[str, Any] = {}

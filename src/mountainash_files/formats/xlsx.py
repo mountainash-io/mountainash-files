@@ -11,7 +11,6 @@ from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._rows import apply_header_plan
 from mountainash_files.formats._types import FormatSpec
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -20,28 +19,6 @@ class XlsxSpec(FormatSpec):
     SUFFIXES: ClassVar[tuple[str, ...]] = (".xlsx", ".xlsm", ".xlsb", ".ods")
     MEDIATYPES: ClassVar[tuple[str, ...]] = (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
-        ProviderFormatDescriptor(
-            "xlsx", frozenset(), frozenset({".xlsx"}),
-            frozenset({"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
-            frozenset(), "spreadsheet", "xlsx",
-        ),
-        ProviderFormatDescriptor(
-            "xlsm", frozenset(), frozenset({".xlsm"}),
-            frozenset({"application/vnd.ms-excel.sheet.macroenabled.12"}),
-            frozenset(), "spreadsheet", "xlsx",
-        ),
-        ProviderFormatDescriptor(
-            "xlsb", frozenset(), frozenset({".xlsb"}),
-            frozenset({"application/vnd.ms-excel.sheet.binary.macroenabled.12"}),
-            frozenset(), "spreadsheet", "xlsx",
-        ),
-        ProviderFormatDescriptor(
-            "ods", frozenset(), frozenset({".ods"}),
-            frozenset({"application/vnd.oasis.opendocument.spreadsheet"}),
-            frozenset(), "spreadsheet", "xlsx",
-        ),
     )
     sheet_name: str | None = None
     sheet_number: int | None = None

@@ -6,7 +6,6 @@ from typing import Any, BinaryIO, ClassVar
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -15,17 +14,6 @@ class XmlSpec(FormatSpec):
     SUFFIXES: ClassVar[tuple[str, ...]] = (".xml",)
     MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/xml", "text/xml")
     TABULAR: ClassVar[bool] = False
-    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
-        ProviderFormatDescriptor(
-            canonical_format="xml",
-            aliases=frozenset(),
-            suffixes=frozenset({".xml"}),
-            mediatypes=frozenset({"application/xml", "text/xml"}),
-            locator_prefixes=frozenset(),
-            dialect_family=None,
-            provider_format_key="xml",
-        ),
-    )
 
     xpath: str | None = None
     encoding: str | None = None

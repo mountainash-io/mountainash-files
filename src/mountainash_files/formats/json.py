@@ -9,7 +9,6 @@ import pyarrow as pa
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -17,11 +16,6 @@ class JsonSpec(FormatSpec):
     FORMAT: ClassVar[str] = "json"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".json", ".ndjson", ".jsonl", ".geojson")
     MEDIATYPES: ClassVar[tuple[str, ...]] = ("application/json", "application/x-ndjson")
-    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
-        ProviderFormatDescriptor("json", frozenset(), frozenset({".json"}), frozenset({"application/json"}), frozenset(), "structured", "json"),
-        ProviderFormatDescriptor("ndjson", frozenset({"jsonl"}), frozenset({".ndjson", ".jsonl"}), frozenset({"application/ndjson", "application/x-ndjson"}), frozenset(), "structured", "json"),
-        ProviderFormatDescriptor("geojson", frozenset(), frozenset({".geojson"}), frozenset({"application/geo+json"}), frozenset(), "structured", "json"),
-    )
     property: str | None = None
     item_type: Literal["object", "array"] | None = None
     item_keys: tuple[str, ...] | None = None

@@ -13,7 +13,6 @@ from mountainash_files.formats._exceptions import (
     UnknownFormatError,
 )
 from mountainash_files.formats._types import FormatSpec
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 _logger = logging.getLogger(__name__)
 
@@ -269,17 +268,6 @@ def get_spec_class(format_key: str) -> type[FormatSpec]:
         return ref
 
 
-def iter_provider_formats() -> tuple[ProviderFormatDescriptor, ...]:
-    """Return physical provider descriptors declared by registered format specs."""
-    if not _SPECS:
-        import mountainash_files.formats  # noqa: F401
-
-    with _LOCK:
-        descriptors: list[ProviderFormatDescriptor] = []
-        for format_key in sorted(_SPECS):
-            spec_class = get_spec_class(format_key)
-            descriptors.extend(spec_class.PROVIDER_FORMATS)
-    return tuple(descriptors)
 
 
 def get_serialiser(format_key: str) -> t.Callable | None:
