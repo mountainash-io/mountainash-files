@@ -10,7 +10,6 @@ import pyarrow.parquet as pq
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
-from mountainash_resource_provider import ProviderFormatDescriptor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -22,17 +21,6 @@ class ParquetSpec(FormatSpec):
         "application/x-parquet",
     )
     APPENDABLE: ClassVar[bool] = True
-    PROVIDER_FORMATS: ClassVar[tuple[ProviderFormatDescriptor, ...]] = (
-        ProviderFormatDescriptor(
-            canonical_format="parquet",
-            aliases=frozenset(),
-            suffixes=frozenset({".parquet"}),
-            mediatypes=frozenset({"application/vnd.apache.parquet", "application/x-parquet"}),
-            locator_prefixes=frozenset(),
-            dialect_family=None,
-            provider_format_key="parquet",
-        ),
-    )
 
     columns: tuple[str, ...] | None = None
 
