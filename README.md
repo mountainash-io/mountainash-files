@@ -1,6 +1,17 @@
 # mountainash-files
 
 Composable file operations with format detection and parsing.
+Requires Python 3.12 or later.
+
+## Candidate verification and publishing
+
+Public PyPI publication remains unconfirmed. `mountainash-transport>=26.7.0` and its settings/auth-client/secrets closure must be public before candidate verification can pass; local sibling wheels are diagnostic inputs only.
+
+`build-and-release-package.yml` builds and verifies PR/manual candidates using Python 3.12, fresh external wheel/sdist installations, public PyPI dependencies, `pip check` and module-origin evidence.
+
+Prepare the final version through the normal reviewed release PR. Separately configure the `pypi` GitHub environment with human reviewers and a custom deployment policy allowing only the `main` branch, plus a PyPI Trusted Publisher for this repository, workflow filename `build-and-release-package.yml`, and environment `pypi`. A pending publisher does not reserve the name.
+
+Publication requires an authorized manual `main` run with `publish=true` and environment approval. It uploads the exact verified artifact IDs/hashes, never rebuilds or uses `skip-existing`, and confirms public hashes and installation afterward. `publish=false` and PR runs remain candidate-only.
 
 ## Overview
 

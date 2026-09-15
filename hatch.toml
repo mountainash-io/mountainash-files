@@ -7,6 +7,9 @@ path = "src/mountainash_files/__version__.py"
 [build.targets.wheel]
 packages = ["src/mountainash_files"]
 
+[build.targets.sdist]
+include = ["/src", "/pyproject.toml", "/hatch.toml", "/README.md", "/LICENSE"]
+
 [envs.default]
 installer = "uv"
 path = ".venv"
