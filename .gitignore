@@ -29,3 +29,10 @@ htmlcov/
 
 # Hatch
 .hatch/
+
+# CI checkouts and generated evidence
+temp/
+sbom-*.json
+requirements.txt
+coverage.xml
+junit.xml
