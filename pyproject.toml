@@ -7,7 +7,7 @@ name = "mountainash_files"
 dynamic = ["version"]
 description = "Mountain Ash - Files — Composable file operations with format detection and parsing"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 keywords = []
 authors = [
     { name = "Nathaniel Ramm", email = "nathaniel.ramm@discretedatascience.com" },
@@ -15,14 +15,13 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
     "pyarrow>=16",
-    "mountainash-transport>=26.7.0",
+    "mountainash-transport>=26.7.0,<27",
 ]
 
 
@@ -32,9 +31,12 @@ mountainash-transport = { path = "../mountainash-transport" }
 [project.optional-dependencies]
 xlsx = ["fastexcel>=0.12", "openpyxl>=3.1"]
 xml = ["lxml>=4.9"]
-s3 = ["mountainash-transport[s3]>=26.7.0"]
-gcs = ["mountainash-transport[gcs]>=26.7.0"]
-azure = ["mountainash-transport[azure]>=26.7.0"]
-sftp = ["mountainash-transport[sftp]>=26.7.0"]
-encryption = ["mountainash-transport[encryption]>=26.7.0"]
+s3 = ["mountainash-transport[s3]>=26.7.0,<27"]
+gcs = ["mountainash-transport[gcs]>=26.7.0,<27"]
+azure = ["mountainash-transport[azure]>=26.7.0,<27"]
+sftp = ["mountainash-transport[sftp]>=26.7.0,<27"]
+encryption = ["mountainash-transport[encryption]>=26.7.0,<27"]
 all = ["mountainash-files[xlsx,xml,s3,gcs,azure,sftp,encryption]"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
