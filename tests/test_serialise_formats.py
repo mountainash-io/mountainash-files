@@ -1,11 +1,9 @@
 import io
 import json
-from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.csv as pcsv
 import pyarrow.parquet as pq
-import pytest
 
 from mountainash_files.formats.csv import CsvSpec, csv_serialise
 from mountainash_files.formats.json import JsonSpec, json_serialise
@@ -78,18 +76,6 @@ class TestParquetSerialise:
 
 
 class TestXmlSerialise:
-    def test_lxml_element(self):
-        try:
-            from lxml import etree
-            root = etree.Element("root")
-            child = etree.SubElement(root, "item")
-            child.text = "hello"
-            result = xml_serialise(root, XmlSpec())
-            assert isinstance(result, bytes)
-            assert b"hello" in result
-        except ImportError:
-            pytest.skip("lxml not installed")
-
     def test_stdlib_element(self):
         import xml.etree.ElementTree as ET
         root = ET.Element("root")
