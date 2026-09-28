@@ -1,0 +1,7 @@
+# Source constraints apply during both Hatch project installation and env sync.
+# HATCH_SIBLINGS is a file URI: ../ locally, temp/ in CI.
+mountainash-settings @ ${HATCH_SIBLINGS}/mountainash-settings
+mountainash-auth-client @ ${HATCH_SIBLINGS}/mountainash-auth-client
+mountainash-transport @ ${HATCH_SIBLINGS}/mountainash-transport
+# Used only by the explicit Mountainash integration environment.
+mountainash @ ${HATCH_SIBLINGS}/mountainash

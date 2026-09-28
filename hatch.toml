@@ -14,7 +14,6 @@ dependencies = [
     "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
-    "mountainash_secrets @     {root:uri}/../mountainash-secrets",
 ]
 
 [[envs.test.matrix]]
@@ -22,6 +21,7 @@ python = ["3.12"]
 
 [envs.test]
 installer = "uv"
+path = ".hatch/test"
 dependencies = [
     "pytest==8.3.5",
     "pytest-check==2.5.3",
@@ -34,9 +34,6 @@ dependencies = [
     "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
-    "mountainash_secrets @     {root:uri}/../mountainash-secrets",
-    "mountainash @             {root:uri}/../mountainash",
-    "mountainash_files @ {root:uri}",
 ]
 [envs.test.scripts]
 test = "pytest"
@@ -44,7 +41,7 @@ cov = "pytest --cov --cov-report=term-missing"
 
 [envs.ruff]
 installer = "uv"
-skip-install = true
+detached = true
 dependencies = ["ruff==0.3.7"]
 [envs.ruff.scripts]
 check = "ruff check ./src"
@@ -52,6 +49,19 @@ fix = "ruff check ./src --fix"
 
 [envs.mypy]
 installer = "uv"
+path = ".hatch/mypy"
 dependencies = ["mypy==1.10.1"]
 [envs.mypy.scripts]
 check = "mypy --install-types --non-interactive {args:src/mountainash_files tests}"
+
+[envs.test_mountainash]
+template = "test"
+path = ".hatch/test-mountainash"
+extra-dependencies = ["mountainash @ {root:uri}/../mountainash"]
+
+[envs.test_mountainash.scripts]
+test = "pytest tests_optional/mountainash {args}"
+
+[envs.default.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/.."
