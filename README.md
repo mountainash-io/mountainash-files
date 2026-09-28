@@ -141,12 +141,10 @@ There is no global provider-name secret selection. Passing only a profile name
 whose configuration contains custom secret references fails without a selected
 reader; local files need no store. Files does not acquire store ownership.
 
-The transport `>=26.7.0,<27` range is provisional for the migration rehearsal:
-the published 26.7.0 wheel is not the migrated candidate. Verification must pin
-the exact transport/settings/auth-client artifacts, and the dependency floor
-must advance to the migrated transport release before publication. Downstream
-merge/publication remains on hold until settings 0.1.0 is published. This work
-does not qualify remote services or the separate mountainash consumer release.
+The coordinated development baseline is **0.1.0**, with transport and its
+forwarded extras bounded to `>=0.1.0,<0.2`. Hatch selects sibling source checkouts;
+verification records the exact commits and artifact hashes. Publication remains
+a separate gate from develop integration.
 
 ## Tests
 

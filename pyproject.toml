@@ -21,17 +21,17 @@ classifiers = [
 ]
 dependencies = [
     "pyarrow>=16",
-    "mountainash-transport>=26.7.0,<27",
+    "mountainash-transport>=0.1.0,<0.2",
 ]
 
 [project.optional-dependencies]
 xlsx = ["fastexcel>=0.12", "openpyxl>=3.1"]
 xml = ["lxml>=4.9"]
-s3 = ["mountainash-transport[s3]>=26.7.0,<27"]
-gcs = ["mountainash-transport[gcs]>=26.7.0,<27"]
-azure = ["mountainash-transport[azure]>=26.7.0,<27"]
-sftp = ["mountainash-transport[sftp]>=26.7.0,<27"]
-encryption = ["mountainash-transport[encryption]>=26.7.0,<27"]
+s3 = ["mountainash-transport[s3]>=0.1.0,<0.2"]
+gcs = ["mountainash-transport[gcs]>=0.1.0,<0.2"]
+azure = ["mountainash-transport[azure]>=0.1.0,<0.2"]
+sftp = ["mountainash-transport[sftp]>=0.1.0,<0.2"]
+encryption = ["mountainash-transport[encryption]>=0.1.0,<0.2"]
 all = ["mountainash-files[xlsx,xml,s3,gcs,azure,sftp,encryption]"]
 
 [tool.pytest.ini_options]
