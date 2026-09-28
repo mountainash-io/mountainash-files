@@ -7,15 +7,73 @@ path = "src/mountainash_files/__version__.py"
 [build.targets.wheel]
 packages = ["src/mountainash_files"]
 
+[build.targets.sdist]
+include = ["/src", "/tests", "/tests_optional", "/pyproject.toml", "/hatch.toml", "/requirements-hatch.txt", "/README.md", "/LICENSE"]
+
+#================
+# Env: build_github
+#================
+[envs.build_github]
+python = "3.12"
+installer = "uv"
+# Hatch installs the project before syncing environment dependencies.
+dependencies = [
+    "cyclonedx-bom==4.5.0",
+
+    "mountainash_settings @    {root:uri}/temp/mountainash-settings",
+    "mountainash_auth_client @ {root:uri}/temp/mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/temp/mountainash-transport",
+]
+[envs.build_github.scripts]
+sbom-all = "cyclonedx-py environment > ./sbom-full.json"
+sbom-direct = "cyclonedx-py requirements > ./sbom-direct.json"
+export-requirements = "hatch dep show requirements > ./requirements.txt"
+
+#================
+# Env: default
+#================
 [envs.default]
+python = "3.12"
 installer = "uv"
 path = ".venv"
+# Hatch installs the project before syncing environment dependencies.
 dependencies = [
-    "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/../mountainash-transport",
 ]
 
+#================
+# Env: test_github
+#================
+[[envs.test_github.matrix]]
+python = ["3.12"]
+
+[envs.test_github]
+installer = "uv"
+path = ".hatch/test-github"
+# Hatch installs the project before syncing environment dependencies.
+dependencies = [
+    "pytest==8.3.5",
+    "pytest-check==2.5.3",
+    "pytest-mock==3.12.0",
+    "pytest-cov>=4.1.0",
+    "pytest-clarity>=1.0.1",
+    "openpyxl>=3.1",
+    "fastexcel>=0.12",
+    "lxml>=4.9",
+
+    "mountainash_settings @    {root:uri}/temp/mountainash-settings",
+    "mountainash_auth_client @ {root:uri}/temp/mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/temp/mountainash-transport",
+]
+[envs.test_github.scripts]
+test = "pytest"
+cov = "pytest --cov --junitxml=junit.xml -o junit_family=legacy --cov-report=xml"
+
+#================
+# Env: test
+#================
 [[envs.test.matrix]]
 python = ["3.12"]
 
@@ -31,14 +89,13 @@ dependencies = [
     "openpyxl>=3.1",
     "fastexcel>=0.12",
     "lxml>=4.9",
-    "mountainash_transport @ {root:uri}/../mountainash-transport",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/../mountainash-transport",
 ]
 [envs.test.scripts]
 test = "pytest"
 cov = "pytest --cov --cov-report=term-missing"
-
 [envs.ruff]
 installer = "uv"
 detached = true
@@ -65,3 +122,11 @@ test = "pytest tests_optional/mountainash {args}"
 [envs.default.env-vars]
 UV_CONSTRAINT = "{root}/requirements-hatch.txt"
 HATCH_SIBLINGS = "{root:uri}/.."
+
+[envs.test_github.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/temp"
+
+[envs.build_github.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/temp"
