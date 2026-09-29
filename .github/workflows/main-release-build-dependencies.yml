@@ -31,7 +31,6 @@ jobs:
           owner: mountainash-io
           repositories: |
             mountainash-settings
-            mountainash-secrets
             mountainash-auth-client
             mountainash-transport
 
