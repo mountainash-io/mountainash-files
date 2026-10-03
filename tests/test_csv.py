@@ -27,7 +27,7 @@ def test_skip_initial_space_is_discriminating(enabled: bool, expected: str) -> N
 
 
 def test_quote_aware_records_keep_embedded_newlines_and_comments() -> None:
-    data = b"# comment\nname,note\na,\"line one\n# still data\"\n"
+    data = b'# comment\nname,note\na,"line one\n# still data"\n'
     table = csv_parse(data, CsvSpec(comment_char="#"))
     assert table.to_pylist() == [{"name": "a", "note": "line one\n# still data"}]
 
@@ -57,9 +57,56 @@ def test_null_sequence_and_escape_mode() -> None:
     assert table.to_pylist() == [{"a": None, "b": 'he said "hi"'}]
 
 
-def test_empty_delimiter_is_rejected() -> None:
+@pytest.mark.parametrize(
+    ("wire", "spec", "expected"),
+    [
+        (b"x\na\\,b\n", CsvSpec(quote_char=None, escape_char="\\"), "a,b"),
+        (b'x\n"trailing\\\\"\n', CsvSpec(escape_char="\\"), "trailing\\"),
+        (b'x\n"a\\"b"\n', CsvSpec(double_quote=False, escape_char="\\"), 'a"b'),
+        (
+            b"x@@a\\|\\|b@@",
+            CsvSpec(
+                delimiter="||", line_terminator="@@", quote_char=None, escape_char="\\"
+            ),
+            "a||b",
+        ),
+        (b'x\n" leading"\n', CsvSpec(skip_initial_space=True), " leading"),
+        (b"x\na\\\nb\n", CsvSpec(escape_char="\\"), "a\nb"),
+        (
+            b"x\n\\ leading\n",
+            CsvSpec(escape_char="\\", skip_initial_space=True),
+            " leading",
+        ),
+    ],
+)
+def test_delimited_escape_contract(wire: bytes, spec: CsvSpec, expected: str) -> None:
+    assert csv_parse(wire, spec).to_pylist() == [{"x": expected}]
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        CsvSpec(delimiter=""),
+        CsvSpec(line_terminator=""),
+        CsvSpec(delimiter="@@", line_terminator="@@"),
+        CsvSpec(delimiter="|", line_terminator="||"),
+        CsvSpec(delimiter="||", line_terminator="|"),
+        CsvSpec(quote_char="xx"),
+        CsvSpec(escape_char="xx"),
+        CsvSpec(quote_char='"', escape_char='"'),
+        CsvSpec(delimiter='"|'),
+        CsvSpec(line_terminator="\\n", escape_char="\\"),
+        CsvSpec(escape_char=""),
+    ],
+)
+def test_ambiguous_dialect_is_rejected(spec: CsvSpec) -> None:
     with pytest.raises(ParseError):
-        csv_parse(b"a\n", CsvSpec(delimiter=""))
+        csv_parse(b"x\ny\n", spec)
+
+
+def test_dangling_escape_is_rejected() -> None:
+    with pytest.raises(ParseError):
+        csv_parse(b"x\ntrailing\\", CsvSpec(escape_char="\\"))
 
 
 def test_stream_input() -> None:

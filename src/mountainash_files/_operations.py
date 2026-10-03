@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 
 from mountainash_transport import PathNotFoundError, Pipeline, StorageFacade
 
-from mountainash_files._exceptions import WriteError
+from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
 from mountainash_files.formats._registry import (
     get_parser,
     get_serialiser,
@@ -26,6 +26,8 @@ from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
 
 if TYPE_CHECKING:
+    import pyarrow as pa
+
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import StorageProfileProtocol
 
@@ -228,8 +230,12 @@ def parse(
                     "on_unrecognised='skip'",
                 ) from exc
             parser = get_parser(fmt_key)
-            result_data = _normalise_output(parser(member_data, fmt_spec), output, fmt_spec)
-            results.append(ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec))
+            result_data = _normalise_output(
+                parser(member_data, fmt_spec), output, fmt_spec
+            )
+            results.append(
+                ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec)
+            )
         if not results:
             raise ParseError(
                 "archive",
@@ -270,6 +276,54 @@ def parse(
     return [ParseResult(data=result_data, format_key=format_key, spec=spec)]
 
 
+def _append_table(data: Any) -> pa.Table:
+    """Normalize append records, retaining keys first seen in later rows."""
+    import pyarrow as pa
+
+    if isinstance(data, pa.Table):
+        return data
+    if isinstance(data, dict):
+        rows = [data]
+    elif isinstance(data, list) and all(isinstance(row, dict) for row in data):
+        rows = data
+    else:
+        raise WriteError("Tabular append requires an Arrow table or record data")
+    keys = list(dict.fromkeys(key for row in rows for key in row))
+    try:
+        return pa.Table.from_pylist(
+            [{key: row.get(key) for key in keys} for row in rows]
+        )
+    except (pa.ArrowException, TypeError, ValueError, OverflowError) as exc:
+        raise WriteError(f"Cannot normalize append input: {exc}") from exc
+
+
+def _merge_append_tables(path: str, existing: pa.Table, incoming: pa.Table) -> pa.Table:
+    """Keep destination metadata and union nullability without schema evolution."""
+    import pyarrow as pa
+
+    old, new = existing.schema, incoming.schema
+    if old.names != new.names or old.types != new.types:
+        raise AppendSchemaMismatchError(path, old, new)
+    schema = pa.schema(
+        [
+            pa.field(
+                left.name,
+                left.type,
+                nullable=left.nullable or right.nullable,
+                metadata=left.metadata,
+            )
+            for left, right in zip(old, new)
+        ],
+        metadata=old.metadata,
+    )
+    try:
+        before = pa.Table.from_arrays(existing.columns, schema=schema)
+        after = pa.Table.from_arrays(incoming.columns, schema=schema)
+        return pa.concat_tables([before, after])
+    except pa.ArrowException as exc:
+        raise WriteError(f"Cannot combine append tables for {path!r}: {exc}") from exc
+
+
 def write(
     sink: FileSinkSpec,
     data: Any,
@@ -283,9 +337,18 @@ def write(
 
     storage_profile, auth_profile = _resolve_profiles(sink)
 
+    if sink.write_disposition not in ("replace", "append"):
+        raise WriteError(f"Unknown write disposition: {sink.write_disposition!r}")
+    if sink.write_disposition == "append" and isinstance(
+        data, (bytes, bytearray, memoryview)
+    ):
+        raise WriteError("Raw-byte append is not supported; supply tabular records")
+
     # Raw bytes bypass format handling
     if isinstance(data, bytes):
-        _write_bytes(path, data, storage_profile, auth_profile, sink.create_path, sink.transforms)
+        _write_bytes(
+            path, data, storage_profile, auth_profile, sink.create_path, sink.transforms
+        )
         return
 
     # Resolve format
@@ -301,16 +364,49 @@ def write(
         overrides = get_suffix_overrides(matched_suffix)
         spec = get_spec_class(format_key)(**overrides)
 
-    if sink.write_disposition == "append" and not type(spec).APPENDABLE:
-        raise WriteError(f"Format {format_key!r} does not support append.")
-
     serialiser = get_serialiser(format_key)
     if serialiser is None:
         raise WriteError(f"No serialiser registered for format {format_key!r}")
 
+    if sink.write_disposition == "append":
+        import pyarrow as pa
+
+        from mountainash_files.formats.parquet import ParquetSpec
+
+        if not type(spec).APPENDABLE or not type(spec).TABULAR:
+            raise WriteError(
+                f"Format {format_key!r} does not support append of tabular data."
+            )
+        incoming = _append_table(data)
+        try:
+            raw = _read_bytes(
+                path, storage_profile, auth_profile, sink.transforms, infer=False
+            )
+        except Exception as exc:
+            if not _is_not_found(exc):
+                raise
+            data = incoming
+        else:
+            read_spec = (
+                dataclasses.replace(spec, columns=None)
+                if isinstance(spec, ParquetSpec)
+                else spec
+            )
+            existing = get_parser(format_key)(raw, read_spec)
+            if not isinstance(existing, pa.Table):
+                raise WriteError(
+                    f"Append parser for {format_key!r} must return a complete Arrow table"
+                )
+            data = _merge_append_tables(path, existing, incoming)
+
     serialised = serialiser(data, spec)
     _write_bytes(
-        path, serialised, storage_profile, auth_profile, sink.create_path, sink.transforms
+        path,
+        serialised,
+        storage_profile,
+        auth_profile,
+        sink.create_path,
+        sink.transforms,
     )
 
 
@@ -341,7 +437,9 @@ def copy(
             return
         raise
 
-    _write_bytes(dst_path, data, dst_profile, dst_auth, sink.create_path, sink.transforms)
+    _write_bytes(
+        dst_path, data, dst_profile, dst_auth, sink.create_path, sink.transforms
+    )
 
 
 @contextlib.contextmanager
@@ -362,17 +460,12 @@ def stream(
 
     try:
         data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
-    except (FileNotFoundError, Exception) as exc:
-        if source.on_missing == "skip" and _is_not_found(exc):
-            yield io.BytesIO(b"")
-            return
-        raise
-
-    buf = io.BytesIO(data)
-    try:
+    except Exception as exc:
+        if source.on_missing != "skip" or not _is_not_found(exc):
+            raise
+        data = b""
+    with io.BytesIO(data) as buf:
         yield buf
-    finally:
-        buf.close()
 
 
 def _is_not_found(exc: Exception) -> bool:

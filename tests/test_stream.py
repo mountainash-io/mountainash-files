@@ -1,3 +1,4 @@
+import contextlib
 from pathlib import Path
 
 import pytest
@@ -28,9 +29,38 @@ class TestStreamLocal:
             with stream(source) as s:
                 s.read()
 
-    def test_stream_missing_skip(self):
-        source = FileSourceSpec(path="/nonexistent/file.csv", on_missing="skip")
-        with stream(source) as s:
-            assert s is not None
-            data = s.read()
-            assert data == b""
+    @pytest.mark.parametrize("missing", [False, True])
+    @pytest.mark.parametrize("caller_raises", [False, True])
+    def test_stream_lifetime(self, tmp_path, missing, caller_raises):
+        path = tmp_path / "data.bin"
+        if not missing:
+            path.write_bytes(b"payload")
+        source = FileSourceSpec(path=str(path), on_missing="skip")
+        expected_exit = (
+            pytest.raises(RuntimeError, match="caller")
+            if caller_raises
+            else contextlib.nullcontext()
+        )
+        with expected_exit:
+            with stream(source) as handle:
+                assert not handle.closed
+                assert handle.read() == (b"" if missing else b"payload")
+                if caller_raises:
+                    raise RuntimeError("caller")
+        assert handle.closed
+
+    def test_stream_skip_does_not_hide_permission_error(self, tmp_path, monkeypatch):
+        from mountainash_transport import StorageFacade
+
+        denied = PermissionError("denied")
+
+        def fail_read(self, path, **kwargs):
+            raise denied
+
+        monkeypatch.setattr(StorageFacade, "read", fail_read)
+        with pytest.raises(PermissionError) as caught:
+            with stream(
+                FileSourceSpec(path=str(tmp_path / "data.csv"), on_missing="skip")
+            ):
+                pytest.fail("permission failure must not yield")
+        assert caught.value is denied

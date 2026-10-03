@@ -16,10 +16,20 @@ from mountainash_files.formats._types import FormatSpec
 
 _logger = logging.getLogger(__name__)
 
-TRANSFORM_SUFFIXES: frozenset[str] = frozenset({
-    ".gz", ".gzip", ".bz2", ".zst", ".lz4", ".xz",
-    ".gpg", ".pgp", ".asc", ".age",
-})
+TRANSFORM_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".gz",
+        ".gzip",
+        ".bz2",
+        ".zst",
+        ".lz4",
+        ".xz",
+        ".gpg",
+        ".pgp",
+        ".asc",
+        ".age",
+    }
+)
 
 _LOCK = threading.RLock()
 
@@ -78,7 +88,7 @@ def _register_builtin_formats() -> None:
         serialiser=parquet_serialise,
         override=True,
     )
-    register_format(TsvSpec, csv_parse, override=True)
+    register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
     register_format(
         XlsxSpec,
         xlsx_parse,
@@ -239,7 +249,9 @@ def _resolve(ref: str, format_key: str, field: str) -> t.Any:
         module = importlib.import_module(module_path)
         return getattr(module, attr_name)
     except (ImportError, AttributeError) as exc:
-        raise FormatResolutionError(format_key=format_key, ref=ref, field=field) from exc
+        raise FormatResolutionError(
+            format_key=format_key, ref=ref, field=field
+        ) from exc
 
 
 def get_parser(format_key: str) -> t.Callable:
@@ -266,8 +278,6 @@ def get_spec_class(format_key: str) -> type[FormatSpec]:
             _SPECS[key] = resolved
             return resolved
         return ref
-
-
 
 
 def get_serialiser(format_key: str) -> t.Callable | None:
