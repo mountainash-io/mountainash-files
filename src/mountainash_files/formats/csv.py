@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import dataclasses
-import io
 import re
 from typing import BinaryIO, ClassVar
 
 import pyarrow as pa
 
+from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._delimited import (
+    _validate_delimited_spec,
+    encode_record,
     remove_comment_records,
     scan_logical_records,
     tokenize_record,
@@ -54,7 +56,9 @@ def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
         raise ParseError("csv", str(exc)) from exc
     records = remove_comment_records(scan_logical_records(text, spec), spec)
     rows = tuple(tokenize_record(record, spec) for record in records if record != "")
-    labels, values = apply_header_plan(rows, spec.header, spec.header_rows, spec.header_join)
+    labels, values = apply_header_plan(
+        rows, spec.header, spec.header_rows, spec.header_join
+    )
     arrays = {
         label: _infer_values([row[index] for row in values])
         for index, label in enumerate(labels)
@@ -65,7 +69,9 @@ def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
         raise ParseError("csv", str(exc)) from exc
     if spec.dtypes is not None:
         table = table.cast(
-            pa.schema([pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes])
+            pa.schema(
+                [pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes]
+            )
         )
     if spec.columns is not None:
         table = table.select(list(spec.columns))
@@ -97,15 +103,19 @@ def _resolve_type(dtype_str: str) -> pa.DataType:
 
 
 def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
-    output = io.StringIO()
-    if spec.header:
-        output.write(spec.delimiter.join(data.column_names) + spec.line_terminator)
-    for row in data.to_pylist():
-        output.write(
-            spec.delimiter.join("" if row[name] is None else str(row[name]) for name in data.column_names)
-            + spec.line_terminator
-        )
-    return output.getvalue().encode(spec.encoding)
+    try:
+        _validate_delimited_spec(spec)
+        columns = [column.to_pylist() for column in data.columns]
+        if not columns and data.num_rows:
+            raise ValueError("nonempty zero-column table is not representable")
+        rows: list[tuple[object, ...]] = []
+        if spec.header:
+            rows.append(tuple(data.column_names))
+        rows.extend(zip(*columns))
+        encoded_rows = [encode_record(row, spec) for row in rows]
+        return "".join(encoded_rows).encode(spec.encoding)
+    except (ParseError, ValueError, TypeError, LookupError) as exc:
+        raise WriteError(f"Cannot serialise {spec.FORMAT}: {exc}") from exc
 
 
 register_format(CsvSpec, csv_parse, serialiser=csv_serialise)

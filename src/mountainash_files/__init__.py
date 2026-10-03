@@ -1,7 +1,18 @@
 """mountainash-files: Composable file operations with format detection and parsing."""
 
-from mountainash_files._exceptions import MissingDependencyError, WriteError
-from mountainash_files._operations import copy, parse, parse_bytes, serialise_bytes, stream, write
+from mountainash_files._exceptions import (
+    AppendSchemaMismatchError,
+    MissingDependencyError,
+    WriteError,
+)
+from mountainash_files._operations import (
+    copy,
+    parse,
+    parse_bytes,
+    serialise_bytes,
+    stream,
+    write,
+)
 from mountainash_files.formats._exceptions import (
     FormatConflictError,
     FormatError,
@@ -43,5 +54,6 @@ __all__ = [
     "FormatConflictError",
     "FormatResolutionError",
     "WriteError",
+    "AppendSchemaMismatchError",
     "MissingDependencyError",
 ]
