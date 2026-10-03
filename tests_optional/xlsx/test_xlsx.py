@@ -8,7 +8,7 @@ import pytest
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures"
 
 
 def test_xlsx_defaults_follow_table_dialect() -> None:

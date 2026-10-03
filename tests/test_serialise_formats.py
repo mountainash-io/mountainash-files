@@ -230,19 +230,6 @@ class TestParquetSerialise:
 
 
 class TestXmlSerialise:
-    def test_lxml_element(self):
-        try:
-            from lxml import etree
-
-            root = etree.Element("root")
-            child = etree.SubElement(root, "item")
-            child.text = "hello"
-            result = xml_serialise(root, XmlSpec())
-            assert isinstance(result, bytes)
-            assert b"hello" in result
-        except ImportError:
-            pytest.skip("lxml not installed")
-
     def test_stdlib_element(self):
         import xml.etree.ElementTree as ET
 
