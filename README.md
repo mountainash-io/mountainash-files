@@ -213,6 +213,19 @@ compatible mountainash installation and belongs to the subsequent consumer
 qualification; it is excluded from the default suite. Existing Hatch/uv sibling
 source configuration is development convenience, not installed-artifact proof.
 
+### Type checking
+
+Run `hatch run mypy:check` to check both `src/mountainash_files` and `tests`.
+The dedicated environment installs pytest, packaging, and pinned third-party
+stubs during provisioning; checking does not install packages or require pip.
+To verify provisioning from scratch, run `hatch env remove mypy` first.
+
+The PyArrow stubs currently require PyArrow 20 or newer in this development
+environment; the package's runtime dependency floor remains unchanged.
+The check is not yet clean: sibling transport, auth-client, and settings
+packages lack typing markers, and source/test typing errors remain. These
+diagnostics are retained rather than suppressed or avoided by excluding tests.
+
 ## License
 
 MIT

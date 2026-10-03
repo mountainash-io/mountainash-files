@@ -107,9 +107,18 @@ fix = "ruff check ./src --fix"
 [envs.mypy]
 installer = "uv"
 path = ".hatch/mypy"
-dependencies = ["mypy==1.10.1"]
+# Install typing dependencies during provisioning, not as a side effect of checking.
+dependencies = [
+    "mypy==1.10.1",
+    "pytest==8.3.5",
+    "packaging>=24.0",
+    "pyarrow-stubs==20.0.0.20260819",
+    "lxml-stubs==0.5.1",
+    "types-openpyxl==3.1.5.20260827",
+    "types-PyYAML==6.0.12.20260906",
+]
 [envs.mypy.scripts]
-check = "mypy --install-types --non-interactive {args:src/mountainash_files tests}"
+check = "mypy {args:src/mountainash_files tests}"
 
 [envs.test_mountainash]
 template = "test"
