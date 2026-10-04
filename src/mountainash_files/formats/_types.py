@@ -3,7 +3,16 @@ from __future__ import annotations
 import dataclasses
 import json as _json
 import types
-from typing import Any, ClassVar, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    ClassVar,
+    Self,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 
 class FormatSpec:
@@ -22,6 +31,8 @@ class FormatSpec:
     def to_options(self, *, full: bool = False) -> dict[str, Any]:
         options: dict[str, Any] = {}
 
+        if not dataclasses.is_dataclass(self):
+            raise TypeError("FormatSpec instances must be dataclasses")
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
             if not full:
@@ -41,8 +52,10 @@ class FormatSpec:
         return options
 
     @classmethod
-    def from_options(cls, options: dict[str, Any]) -> "FormatSpec":
+    def from_options(cls, options: dict[str, Any]) -> Self:
         coerced: dict[str, Any] = {}
+        if not dataclasses.is_dataclass(cls):
+            raise TypeError("FormatSpec classes must be dataclasses")
         fields = {field.name: field for field in dataclasses.fields(cls)}
         type_hints = get_type_hints(cls)
 
@@ -56,7 +69,7 @@ class FormatSpec:
             else:
                 coerced[name] = value
 
-        return cls(**coerced)
+        return cast(Self, cls(**coerced))
 
 
 def _reject_non_json(value: Any) -> Any:

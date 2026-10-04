@@ -304,6 +304,11 @@ def _merge_append_tables(path: str, existing: pa.Table, incoming: pa.Table) -> p
     old, new = existing.schema, incoming.schema
     if old.names != new.names or old.types != new.types:
         raise AppendSchemaMismatchError(path, old, new)
+    metadata: dict[bytes | str, bytes | str] | None = (
+        None
+        if old.metadata is None
+        else {key: value for key, value in old.metadata.items()}
+    )
     schema = pa.schema(
         [
             pa.field(
@@ -314,7 +319,7 @@ def _merge_append_tables(path: str, existing: pa.Table, incoming: pa.Table) -> p
             )
             for left, right in zip(old, new)
         ],
-        metadata=old.metadata,
+        metadata=metadata,
     )
     try:
         before = pa.Table.from_arrays(existing.columns, schema=schema)
