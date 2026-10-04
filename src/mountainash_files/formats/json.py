@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json as _json
-from typing import BinaryIO, ClassVar, Literal
+from typing import Any, BinaryIO, ClassVar, Literal, cast
 
 import pyarrow as pa
 
@@ -35,7 +35,7 @@ def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> pa.Table | list[object
         )
     except (_json.JSONDecodeError, ValueError) as exc:
         raise ParseError("json", str(exc)) from exc
-    if spec.property not in (None, ""):
+    if spec.property:
         for key in spec.property.split("."):
             if not isinstance(source, dict) or key not in source:
                 raise ParseError("json", f"property {spec.property!r} was not found")
@@ -59,16 +59,17 @@ def _resolve_rows(records: list[object], spec: JsonSpec) -> pa.Table | list[obje
     if any(not isinstance(row, dict if shape == "object" else list) for row in records):
         raise ParseError("json", "mixed or unsupported structured row shapes")
     if shape == "object":
+        objects = cast(list[dict[str, Any]], records)
         keys = spec.item_keys or tuple(
-            dict.fromkeys(key for row in records for key in row)
+            dict.fromkeys(key for row in objects for key in row)
         )
         try:
             return pa.Table.from_pylist(
-                [{key: row.get(key) for key in keys} for row in records]
+                [{key: row.get(key) for key in keys} for row in objects]
             )
         except pa.ArrowException as exc:
             raise ParseError("json", str(exc)) from exc
-    rows = records
+    rows = cast(list[list[Any]], records)
     width = len(rows[0])
     if any(len(row) != width for row in rows):
         raise ParseError("json", "array row widths differ")

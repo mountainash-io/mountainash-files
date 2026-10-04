@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from typing import BinaryIO, ClassVar
+from typing import BinaryIO, ClassVar, Sequence
 
 import pyarrow as pa
 
@@ -82,7 +82,7 @@ _INTEGER = re.compile(r"[+-]?\d+\Z")
 _FLOAT = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][+-]?\d+)?\Z")
 
 
-def _infer_values(values: list[str | None]) -> list[str | int | float | None]:
+def _infer_values(values: list[str | None]) -> Sequence[str | int | float | None]:
     non_null = [value for value in values if value is not None]
     if non_null and all(_INTEGER.fullmatch(value) for value in non_null):
         return [None if value is None else int(value) for value in values]
@@ -92,14 +92,15 @@ def _infer_values(values: list[str | None]) -> list[str | int | float | None]:
 
 
 def _resolve_type(dtype_str: str) -> pa.DataType:
-    return {
+    types: dict[str, pa.DataType] = {
         "string": pa.string(),
         "int64": pa.int64(),
         "int32": pa.int32(),
         "float64": pa.float64(),
         "float32": pa.float32(),
         "bool": pa.bool_(),
-    }.get(dtype_str, pa.string())
+    }
+    return types.get(dtype_str, pa.string())
 
 
 def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:

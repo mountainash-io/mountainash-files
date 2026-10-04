@@ -222,9 +222,39 @@ To verify provisioning from scratch, run `hatch env remove mypy` first.
 
 The PyArrow stubs currently require PyArrow 20 or newer in this development
 environment; the package's runtime dependency floor remains unchanged.
-The check is not yet clean: sibling transport, auth-client, and settings
-packages lack typing markers, and source/test typing errors remain. These
-diagnostics are retained rather than suppressed or avoided by excluding tests.
+Use typed settings, auth-client and transport artifacts (settings PR #84,
+auth-client PR #36 and transport PR #100 or their descendants). Source and
+tests are checked together, without import suppression.
+
+Files ships a PEP 561 `py.typed` marker. Public operations, specs, exceptions
+and result wrappers have inline annotations. `FormatSpec.from_options()`
+retains the receiving subclass type. `ParseResult.data` deliberately remains
+dynamic: registered plugins can return arbitrary payloads. JSON parsing
+returns `pyarrow.Table | list[object]`; narrow that union before using table
+methods. These contracts do not imply that every plugin or optional SDK is
+statically typed.
+
+To qualify installed artifacts, build one wheel each for settings, auth-client
+and transport into a directory, then run:
+
+```sh
+hatch run typing:qualify --dependency-wheels /path/to/dependency-wheels \
+  --output /path/outside/the/checkout/new-evidence-directory
+```
+
+The `typing` Hatch environment uses Python 3.12. For Python 3.13, install
+`build==1.4.0` and `packaging` in a Python 3.13 environment and invoke
+`python tools/qualify_typing.py` with the same arguments. The Typing CI workflow
+qualifies both versions. It uses the same dependency-checkout convention as
+the existing test workflow; dependency wheels must contain their markers.
+
+The qualifier builds a direct wheel and an sdist-rebuilt wheel, verifies
+marker inclusion, and checks/runs a consumer in fresh environments outside
+the source checkout. Expected-invalid calls must fail with the specified
+diagnostics; missing errors fail qualification. Receipts retain artifact
+hashes, exact installed origins, dependency versions and logs. The sdist
+includes the qualification recipe and fixture. Local-wheel qualification
+does not establish package publication or minimum-dependency compatibility.
 
 ## License
 

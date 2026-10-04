@@ -40,10 +40,15 @@ def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
         raise MissingDependencyError("fastexcel raw-row spreadsheet parsing", "xlsx")
     try:
         import openpyxl
+        from openpyxl.worksheet._read_only import ReadOnlyWorksheet
+        from openpyxl.worksheet.worksheet import Worksheet
     except ImportError as exc:
         raise MissingDependencyError("XLSX parsing", "xlsx") from exc
     try:
-        workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        workbook = openpyxl.load_workbook(
+            io.BytesIO(raw), read_only=True, data_only=True
+        )
+        worksheet: object
         if spec.sheet_name is not None:
             worksheet = workbook[spec.sheet_name]
         else:
@@ -51,18 +56,29 @@ def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
             if number < 1:
                 raise ParseError("xlsx", "sheet_number is one-based")
             worksheet = workbook.worksheets[number - 1]
-        rows = tuple(tuple(cell for cell in row) for row in worksheet.iter_rows(values_only=True))
+        if not isinstance(worksheet, (Worksheet, ReadOnlyWorksheet)):
+            workbook.close()
+            raise ParseError("xlsx", "Selected sheet is not a worksheet")
+        rows = tuple(
+            tuple(cell for cell in row) for row in worksheet.iter_rows(values_only=True)
+        )
         workbook.close()
     except ParseError:
         raise
     except Exception as exc:
         raise ParseError("xlsx", str(exc)) from exc
     rows = tuple(
-        row for index, row in enumerate(rows, 1)
-        if index not in set(spec.comment_rows) and not (spec.comment_char and str(row[0] or "").startswith(spec.comment_char))
+        row
+        for index, row in enumerate(rows, 1)
+        if index not in set(spec.comment_rows)
+        and not (spec.comment_char and str(row[0] or "").startswith(spec.comment_char))
     )
-    labels, values = apply_header_plan(rows, spec.header, spec.header_rows, spec.header_join)
-    return pa.table({name: [row[index] for row in values] for index, name in enumerate(labels)})
+    labels, values = apply_header_plan(
+        rows, spec.header, spec.header_rows, spec.header_join
+    )
+    return pa.table(
+        {name: [row[index] for row in values] for index, name in enumerate(labels)}
+    )
 
 
 register_format(XlsxSpec, xlsx_parse)

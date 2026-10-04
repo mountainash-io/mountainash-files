@@ -117,8 +117,7 @@ def register_format(
     suffix_overrides: dict[str, dict[str, t.Any]] | None = None,
     override: bool = False,
 ) -> None:
-    lazy = isinstance(spec_cls, str)
-    if lazy:
+    if isinstance(spec_cls, str):
         _validate_dotted(spec_cls, "spec_cls")
         if format_key is None:
             raise ValueError("format_key is required for lazy (string) registrations")
@@ -230,9 +229,9 @@ def resolve_format(
                 s = suffix.lower()
                 if s in TRANSFORM_SUFFIXES:
                     continue
-                fmt = _SUFFIX_MAP.get(s)
-                if fmt is not None:
-                    return fmt, s
+                matched_format = _SUFFIX_MAP.get(s)
+                if matched_format is not None:
+                    return matched_format, s
 
         _raise_unknown(path=path)
 
@@ -300,10 +299,7 @@ def _discover_entrypoint_formats() -> None:
         if _DISCOVERY_DONE:
             return
         _DISCOVERY_DONE = True
-        try:
-            eps = importlib.metadata.entry_points(group="mountainash_files.formats")
-        except TypeError:  # pragma: no cover - Python <3.10 compat shape
-            eps = importlib.metadata.entry_points().get("mountainash_files.formats", [])
+        eps = importlib.metadata.entry_points(group="mountainash_files.formats")
         for ep in sorted(eps, key=lambda e: (e.group, e.name, e.value)):
             try:
                 ep.load()
