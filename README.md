@@ -1,260 +1,140 @@
 # mountainash-files
 
-Composable file operations with format detection and parsing.
-Requires Python 3.12 or later.
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-## Candidate verification and publishing
+Parse and write structured files through one API: CSV, TSV, JSON, Parquet, Excel
+and XML, on local disk or storage supported by `mountainash-transport`. File
+specs combine a path, format options, storage profiles and stream transforms.
+Tabular reads return Arrow tables by default, with Python records available on request.
 
-`build-and-release-package.yml` deliberately separates the branch-aware,
-sibling-wheel **development rehearsal** from public-PyPI readiness. The rehearsal
-builds approved settings, secrets, auth-client, and transport sibling wheels from
-checked-out sources, then verifies files' wheel and an sdist-derived wheel in fresh
-external environments. Its evidence records artifact hashes, sibling revisions and
-hashes, install reports, module origins, and full/direct SBOMs. Runtime dependency
-bounds remain unchanged.
+[Examples](examples/) · [Reference](docs/advanced-usage.md) ·
+[Profiles and migration](docs/profiles.md) · [Release process](RELEASE.md)
 
-The opt-in `verify-public` job downloads the exact rehearsal wheel/sdist and
-evidence artifact IDs, rechecks the `release.json` filenames and hashes, builds a
-fresh wheel from the sdist, and verifies both wheels in temporary environments. It
-uses public PyPI only for dependencies and build tools, source-checks static and
-backend-reported dynamic build requirements, retains their actual install reports,
-never consults the sibling wheelhouse, and rejects missing or non-public
-install-report sources. The rebuilt wheel is verification evidence only; it is
-never published.
+## What it provides
 
-Public verification requires compatible PyPI wheels for dependencies and build tools. Source-only dependencies cannot pass and are not built implicitly; the candidate's own sdist is still rebuilt through the controlled path.
-
-For a no-publication public-only rehearsal on any allowed branch:
-
-```sh
-gh workflow run build-and-release-package.yml --repo mountainash-io/mountainash-files \
-  --ref develop -f verify_public=true -f release=false -f publish=false \
-  -f release_type=production -f fallback_branch=develop
-```
-
-Open PRs and default manual runs are development-rehearsal-only. Merged PRs publish
-the exact verified artifacts to a GitHub release and open a `develop` PR in
-`mountainash-io/mountainash-wheels`. Merges into `develop` produce `rc` versions;
-`main` uses the reviewed source version; other supported targets produce beta
-versions. Generated suffixes are not committed.
-
-Manual runs expose independent `release` (GitHub/wheels), `publish` (PyPI), and
-`verify_public` flags, all false by default, plus `release_type` (`production`,
-`rc`, or `beta`) and `fallback_branch` (`develop` or `main`). Publication requires
-an authorized manual `main` run with `publish=true`, `release_type=production`,
-both a successful public-only gate and protected-environment approval. It uploads
-the exact verified wheel/sdist with unchanged OIDC and hash confirmation; no
-rebuild, asset replacement, or `skip-existing` fallback is used. Post-publication
-installation accepts only `distribution==version` from public PyPI and rejects
-every local/non-public dependency source. Use `release=false` for a PyPI-only run
-when the GitHub release already exists.
-
-See the [shared release procedures](https://github.com/mountainash-io/mountainash-central/blob/main/05.devops/releases/shared/README.md)
-for the distinction between source/wheelhouse rehearsal, public-only readiness, and
-actual publication.
-
-**These packages remain unready and unpublished.** Until the entire runtime
-dependency chain is public, a missing dependency is a correct public-only readiness
-failure; no successful end-to-end public-PyPI install is claimed.
-
-## Development and tests
-
-Keep sibling checkouts next to this repository: `mountainash-settings`,
-`mountainash-secrets`, `mountainash-auth-client`, `mountainash-transport`, and
-`mountainash`. Hatch bootstraps the runtime siblings before installing files:
-
-```sh
-hatch run test:test
-hatch run test:cov
-```
-
-CI checks out the four runtime siblings into `temp/` from the PR head branch
-(or dispatched ref), falling back to the PR base branch (or `fallback_branch`).
-The pytest workflow separately checks out test-only `mountainash`, then runs
-`hatch run test_github:cov`. All tests under `tests/`, including cross-package
-integration tests, run; sibling repositories' own suites are not collected.
-Hatch owns local/CI source paths rather than a conflicting local-only uv override.
-The `build_github` environment supplies the SBOM commands. Main-targeting PRs also
-validate runtime dependencies and require a `release/*` or `hotfix/*` source branch.
-
-Requires Python 3.12 or newer.
-
-## Overview
-
-This package provides a unified interface for file operations across multiple file formats with automatic format detection and parsing capabilities.
-
-## Support matrix
-
-### Formats
-
-| Format | Parse | Serialise | Append | Extra |
-|---|---|---|---|---|
-| csv / tsv | ✅ | ✅ | — | core (pyarrow) |
-| json | ✅ | ✅ | — | core (pyarrow) |
-| parquet | ✅ | ✅ | ✅ | core (pyarrow) |
-| xlsx | ✅ | — | — | `[xlsx]` (fastexcel or openpyxl) |
-| xml | ✅ | ✅ | — | core (stdlib); `[xml]` for lxml |
-
-CSV/TSV serialization preserves representable lexical values, including delimiters,
-quotes, and embedded line breaks. Unrepresentable values raise `WriteError` before
-the destination is written. Set `null_sequence` to represent nulls explicitly;
-non-null values (including column names) equal to that marker are rejected.
-Without a null marker, nulls retain the empty-field representation. Parsing keeps
-ordinary type inference, so lexical preservation does not promise Arrow type
-round-tripping. TSV uses tabs by default and does not support append.
-
-### Storage (via mountainash-transport)
-
-| Provider | Status | Extra |
+| Area | Capabilities | Explore |
 |---|---|---|
-| local | ✅ implemented | core |
-| http/https | ✅ implemented | core |
-| s3 (aws/express/r2/minio/b2) | ✅ implemented | `[s3]` |
-| sftp | ✅ implemented | `[sftp]` |
-| gcs, azure, ftp, smb, github | profile-only (backend pending in transport) | — |
+| Parsing | Suffix-based format selection; Arrow tables or Python records; in-memory buffers | [Parsing](examples/#parsing) |
+| Format options | Immutable format specs for delimiters, headers, column selection and structured data | [Format options](examples/format_options/) |
+| Writing | Serialisation, format conversion and schema-checked Parquet append | [Writing](examples/#writing) |
+| File selection | Path templates, globs, missing-file handling and ZIP member selection | [Selecting files](examples/#selecting-files) |
+| Transport | Compression pipelines, byte copy, buffered streams and named storage profiles | [Storage and transforms](examples/#storage-and-transforms) |
+| Extension | Register custom parsers and serialisers with `register_format()` | [Reference](docs/advanced-usage.md#custom-formats) |
 
-Named profiles: set `MOUNTAINASH_PROFILES_CONFIG` to a YAML config with a
-`storage_profiles:` section and pass `storage_profile="<name>"` on any
-`FileSourceSpec`/`FileSinkSpec`. Missing extras raise `MissingDependencyError`
-naming the exact extra to install.
+## Installation
 
-## Write modes
+Requires **Python 3.12+**, **PyArrow 16+** and `mountainash-transport` 0.1.
+
+This README describes the **unpublished 0.1.0 candidate**. Until the runtime
+dependency chain is public, install the development checkouts together. From
+the directory that will contain the repositories:
+
+```bash
+git clone --branch develop https://github.com/mountainash-io/mountainash-settings.git
+git clone --branch develop https://github.com/mountainash-io/mountainash-auth-client.git
+git clone --branch develop https://github.com/mountainash-io/mountainash-transport.git
+git clone --branch develop https://github.com/mountainash-io/mountainash-files.git
+cd mountainash-files
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ../mountainash-settings -e ../mountainash-auth-client \
+  -e ../mountainash-transport -e .
+```
+
+| Extra | Adds |
+|---|---|
+| `[xlsx]` | fastexcel and openpyxl for Excel reads |
+| `[xml]` | lxml; basic XML uses the standard library |
+| `[s3]`, `[sftp]` | Transport dependencies for the corresponding backend |
+| `[encryption]` | Transport's GPG support; also requires GnuPG and keys |
+| `[gcs]`, `[azure]` | SDKs for backends still pending in transport |
+| `[all]` | All of the above |
+
+To include extras during the source install, replace `-e .` with, for example,
+`-e '.[xlsx]'`. Missing optional dependencies raise `MissingDependencyError`
+with installation guidance.
+
+## Quick start
+
+Save this as `quickstart.py` and run it with `python quickstart.py`:
 
 ```python
+import tempfile
+from pathlib import Path
+
 import pyarrow as pa
-from mountainash_files import FileSinkSpec, write
+from mountainash_files import FileSinkSpec, FileSourceSpec, parse, write
 
-write(FileSinkSpec(path="rows.parquet", write_disposition="replace"),
-      pa.table({"x": [1]}))
-write(FileSinkSpec(path="rows.parquet", write_disposition="append"),
-      pa.table({"x": [2]}))  # stores rows 1, then 2
+sales = pa.table({"region": ["north", "south"], "total": [120, 95]})
+
+with tempfile.TemporaryDirectory() as root:
+    path = str(Path(root) / "sales.parquet")
+    write(FileSinkSpec(path=path), sales)
+    result, = parse(FileSourceSpec(path=path))
+    print(f"{result.format_key}: {result.data.num_rows} rows")
+    print(result.data.to_pylist())
 ```
 
-`replace` is the default. Tabular `append` reads the complete existing table,
-combines it with the incoming rows, and rewrites the destination. A missing
-destination is created. Supply an Arrow table, a record dictionary, or a list
-of record dictionaries. Raw bytes (including bytearray and memoryview) are
-rejected for append. Formats must declare both `APPENDABLE` and `TABULAR`;
-plugins must parse their complete table as an Arrow table. Parquet read-column
-projection is ignored when loading the append target.
+Expected output:
 
-Ordered column names and Arrow types must match exactly: no implicit casts,
-column reordering, or schema evolution. `AppendSchemaMismatchError`, a public
-`WriteError` subclass, exposes `path`, `expected_schema`, and `actual_schema`.
-Existing schema and field metadata are retained; each field is nullable if
-either input allows nulls. Typed empty tables obey the same rules; an untyped
-empty list has a zero-column schema and does not infer the target's schema.
-
-Append requires full read/write access and single-writer use. Configure a
-symmetric transport `Pipeline` explicitly through the sink's `transforms`
-for compression/encryption; append uses it for both reading and writing.
-Without one, suffixes such as `.gz` do not enable transforms during append.
-Permission and parse errors propagate. Format, input, schema, and serialization
-validation finish before the first destination write.
-
-The entire read-modify-write is in memory and rewrites even compatible empty
-appends. It offers no atomicity or crash recovery beyond the current transport
-guarantees; an interrupted write can damage the destination and concurrent
-writers can lose updates. `copy` remains byte replacement, not table append.
-
-## Settings 0.1 candidate migration
-
-Files uses transport's storage and authentication profiles; secret resolution
-remains owned by settings and transport. Named profiles without custom secret
-references continue to use `MOUNTAINASH_PROFILES_CONFIG` as above.
-
-For a profile containing `secret:record.field`, explicitly select a store and
-resolve the pair before constructing the file spec:
-
-```python
-from mountainash_files import FileSourceSpec, parse
-from mountainash_settings import FilesystemBackend, SettingsParameters
-from mountainash_transport import resolve_storage
-
-# The application securely creates and owns this existing private directory.
-with FilesystemBackend(private_store_directory) as store:
-    parameters = SettingsParameters.create(
-        config_files=["profiles.yaml"], secret_store=store,
-    )
-    storage, auth = resolve_storage("source", settings_parameters=parameters)
-
-# The resolved profiles can be used after the application closes the store.
-results = parse(FileSourceSpec(
-    path="https://example.com/data.csv", storage_profile=storage, auth_profile=auth,
-))
+```text
+parquet: 2 rows
+[{'region': 'north', 'total': 120}, {'region': 'south', 'total': 95}]
 ```
 
-There is no global provider-name secret selection. Passing only a profile name
-whose configuration contains custom secret references fails without a selected
-reader; local files need no store. Files does not acquire store ownership.
+`parse()` always returns a list of `ParseResult`, even for a single file.
+Use `output="pydata"` for Python records. The suffix selects the format;
+`format="csv"` or a format spec overrides it.
 
-The coordinated development baseline is **0.1.0**, with transport and its
-forwarded extras bounded to `>=0.1.0,<0.2`. Hatch selects sibling source checkouts;
-verification records the exact commits and artifact hashes. Publication remains
-a separate gate from develop integration.
+## Supported formats and storage
 
-## Tests
+| Format | Parse | Serialise | Append | Dependency |
+|---|---|---|---|---|
+| CSV / TSV | ✓ | ✓ | — | core |
+| JSON / NDJSON | ✓ | ✓ | — | core |
+| Parquet | ✓ | ✓ | ✓ | core |
+| XLSX | ✓ | — | — | `[xlsx]` |
+| XML | ✓ | ✓ | — | core; `[xml]` for lxml |
 
-`python -m pytest` runs the core suite with core dependencies and pytest,
-pytest-mock, and packaging installed. Optional dependencies are path-selected:
+Append reads and rewrites the complete table, requires matching ordered column
+names and Arrow types, and is intended for a single writer. See
+[write modes](docs/advanced-usage.md#write-modes) for the full contract.
 
-```sh
-# In a separate environment with mountainash-files[xlsx] installed:
-python -m pytest tests_optional/xlsx
-# In a separate environment with mountainash-files[xml] installed:
-python -m pytest tests/test_xml.py tests_optional/xml
-```
+| Storage | Status | Extra |
+|---|---|---|
+| Local disk | implemented | core |
+| HTTP / HTTPS | implemented; operations depend on the server | core |
+| S3, S3 Express, R2, MinIO, B2 | implemented | `[s3]` |
+| SFTP | implemented | `[sftp]` |
+| GCS, Azure, FTP, SMB, GitHub | profiles only; backend pending in transport | — |
 
-The XLSX fixture is tracked under `tests/fixtures`; core tests never generate it
-or require an XLSX engine. Optional cohorts fail if their declared dependency is
-missing rather than skipping unrelated tests. The
-`tests_optional/mountainash/test_relation.py` cohort additionally needs a
-compatible mountainash installation and belongs to the subsequent consumer
-qualification; it is excluded from the default suite. Existing Hatch/uv sibling
-source configuration is development convenience, not installed-artifact proof.
+Pass `storage_profile` and `auth_profile` on a file spec for remote access.
+Named profiles and explicit secret-store selection are covered in
+[profiles and migration](docs/profiles.md). Available operations depend on the
+transport backend; having a profile or an extra does not implement a backend.
 
-### Type checking
+## Learn more
 
-Run `hatch run mypy:check` to check both `src/mountainash_files` and `tests`.
-The dedicated environment installs pytest, packaging, and pinned third-party
-stubs during provisioning; checking does not install packages or require pip.
-To verify provisioning from scratch, run `hatch env remove mypy` first.
+Explore the [file recipes](examples/): each runs offline and independently,
+using the same small sales dataset and documenting its expected output.
 
-The PyArrow stubs currently require PyArrow 20 or newer in this development
-environment; the package's runtime dependency floor remains unchanged.
-Use typed settings, auth-client and transport artifacts (settings PR #84,
-auth-client PR #36 and transport PR #100 or their descendants). Source and
-tests are checked together, without import suppression.
+| Guide | Contents |
+|---|---|
+| [API and format reference](docs/advanced-usage.md) | Results, format options, append, archives, transforms and extensions |
+| [Profiles and migration](docs/profiles.md) | Named profiles, selected secret stores and the 0.1 baseline |
+| [Contributing](CONTRIBUTING.md) | Source setup, tests, optional cohorts and typing qualification |
+| [Release process](RELEASE.md) | Sibling-wheel rehearsal, public-only verification and publication |
 
-Files ships a PEP 561 `py.typed` marker. Public operations, specs, exceptions
-and result wrappers have inline annotations. `FormatSpec.from_options()`
-retains the receiving subclass type. `ParseResult.data` deliberately remains
-dynamic: registered plugins can return arbitrary payloads. JSON parsing
-returns `pyarrow.Table | list[object]`; narrow that union before using table
-methods. These contracts do not imply that every plugin or optional SDK is
-statically typed.
+## Contributing
 
-To qualify installed artifacts, build one wheel each for settings, auth-client
-and transport into a directory, then run:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks. Branch from
+`develop` and target `develop` with pull requests.
 
-```sh
-hatch run typing:qualify --dependency-wheels /path/to/dependency-wheels \
-  --output /path/outside/the/checkout/new-evidence-directory
-```
-
-The `typing` Hatch environment uses Python 3.12. For Python 3.13, install
-`build==1.4.0` and `packaging` in a Python 3.13 environment and invoke
-`python tools/qualify_typing.py` with the same arguments. The Typing CI workflow
-qualifies both versions. It uses the same dependency-checkout convention as
-the existing test workflow; dependency wheels must contain their markers.
-
-The qualifier builds a direct wheel and an sdist-rebuilt wheel, verifies
-marker inclusion, and checks/runs a consumer in fresh environments outside
-the source checkout. Expected-invalid calls must fail with the specified
-diagnostics; missing errors fail qualification. Receipts retain artifact
-hashes, exact installed origins, dependency versions and logs. The sdist
-includes the qualification recipe and fixture. Local-wheel qualification
-does not establish package publication or minimum-dependency compatibility.
+Part of the [Mountain Ash ecosystem](https://github.com/mountainash-io), alongside
+`mountainash-settings`, `mountainash-auth-client`, `mountainash-transport`,
+`mountainash-data` and `mountainash`. Transport owns storage access;
+auth-client owns authentication models and OAuth flows.
 
 ## License
 
