@@ -1,0 +1,5 @@
+storage_profiles:
+  reports:
+    provider: local
+    auth:
+      mode: none
