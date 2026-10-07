@@ -54,7 +54,7 @@ class TestRegisterFormat:
         register_format(_FakeSpec, _other_parse, override=True)
         assert get_parser("fake") is _other_parse
 
-    def test_override_cleans_old_suffixes(self):
+    def test_override_cleans_old_suffixes(self) -> None:
         register_format(_FakeSpec, _fake_parse)
 
         @dataclasses.dataclass(frozen=True)
