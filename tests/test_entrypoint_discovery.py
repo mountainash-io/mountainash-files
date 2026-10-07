@@ -33,7 +33,7 @@ def fresh_registry():
     _reset_registry()
 
 
-def _register_toy():
+def _register_toy() -> types.ModuleType:
     import dataclasses
     from typing import ClassVar
 

@@ -55,7 +55,7 @@ def test_to_options_emits_non_default_fields_only():
     assert CsvSpec(delimiter=";").to_options() == {"delimiter": ";"}
 
 
-def test_to_options_skips_default_factory_fields_unless_full():
+def test_to_options_skips_default_factory_fields_unless_full() -> None:
     @dataclasses.dataclass(frozen=True)
     class FactorySpec(FormatSpec):
         FORMAT: ClassVar[str] = "factory"
@@ -104,7 +104,7 @@ def test_from_options_rejects_malformed_fixed_tuple_arity(dtypes):
         CsvSpec.from_options({"dtypes": dtypes})
 
 
-def test_to_options_rejects_non_json_values():
+def test_to_options_rejects_non_json_values() -> None:
     @dataclasses.dataclass(frozen=True)
     class BadSpec(FormatSpec):
         FORMAT: ClassVar[str] = "bad"

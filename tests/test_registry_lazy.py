@@ -50,7 +50,7 @@ def test_mediatype_structured_suffix_fallback():
     assert resolve_format(mediatype="application/geo+json") == ("json", None)
 
 
-def test_mediatype_exact_beats_structured_suffix():
+def test_mediatype_exact_beats_structured_suffix() -> None:
     @dataclasses.dataclass(frozen=True)
     class GeoSpec(FormatSpec):
         FORMAT: ClassVar[str] = "geojson"
@@ -61,7 +61,7 @@ def test_mediatype_exact_beats_structured_suffix():
     assert resolve_format(mediatype="application/geo+json")[0] == "geojson"
 
 
-def test_mediatype_collision_raises():
+def test_mediatype_collision_raises() -> None:
     @dataclasses.dataclass(frozen=True)
     class Toy2Spec(FormatSpec):
         FORMAT: ClassVar[str] = "toy2"
@@ -118,7 +118,7 @@ def test_atomic_registration_no_partial_state():
         resolve_format(format="toy")
 
 
-def test_override_cleans_old_suffixes_and_mediatypes():
+def test_override_cleans_old_suffixes_and_mediatypes() -> None:
     register_format(ToySpec, toy_parse)
 
     @dataclasses.dataclass(frozen=True)

@@ -126,7 +126,7 @@ def test_serialization_rejection_preserves_destination(
 
 
 @pytest.mark.parametrize("tabular", [True, False])
-def test_append_capability_is_spec_declared(tmp_path, tabular):
+def test_append_capability_is_spec_declared(tmp_path: Path, tabular: bool) -> None:
     from typing import ClassVar
 
     from mountainash_files import FormatSpec, register_format
@@ -161,7 +161,7 @@ def test_append_capability_is_spec_declared(tmp_path, tabular):
         _reset_registry()
 
 
-def test_append_rejects_plugin_parser_without_arrow_table(tmp_path):
+def test_append_rejects_plugin_parser_without_arrow_table(tmp_path: Path) -> None:
     from typing import ClassVar
 
     from mountainash_files import FormatSpec, register_format
