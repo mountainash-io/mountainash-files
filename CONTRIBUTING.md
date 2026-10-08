@@ -59,6 +59,20 @@ The dedicated environment installs pytest, packaging, and pinned third-party
 stubs during provisioning; checking does not install packages or require pip.
 To verify provisioning from scratch, run `hatch env remove mypy` first.
 
+For independent source and test targets:
+
+```sh
+hatch run mypy:check-src
+hatch run mypy:check-tests
+hatch run mypy:check-src-untyped
+hatch run mypy:check-tests-untyped
+```
+
+These commands accept extra mypy flags without replacing their targets. The
+`-untyped` variants include `--check-untyped-defs` to check bodies of unannotated
+functions. Test checks still follow source imports and can also report source
+errors.
+
 The PyArrow stubs currently require PyArrow 20 or newer in this development
 environment; the package's runtime dependency floor remains unchanged.
 Use typed settings, auth-client and transport artifacts (settings PR #84,
