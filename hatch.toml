@@ -119,6 +119,10 @@ dependencies = [
 ]
 [envs.mypy.scripts]
 check = "mypy {args:src/mountainash_files tests}"
+check-src = "mypy src/mountainash_files {args}"
+check-tests = "mypy tests {args}"
+check-src-untyped = "mypy --check-untyped-defs src/mountainash_files {args}"
+check-tests-untyped = "mypy --check-untyped-defs tests {args}"
 
 [envs.typing]
 detached = true
