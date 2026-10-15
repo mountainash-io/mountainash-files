@@ -1,3 +1,4 @@
+import gzip
 import io
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -14,6 +15,49 @@ from mountainash_files.specs.archive import ZipArchive, GzipCompression
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.mark.parametrize("infer", [None, False, True])
+def test_explicit_pipeline_inference_policy(tmp_path, infer):
+    from mountainash_transport import Gzip, Pipeline
+
+    path = tmp_path / "rows.csv.gz"
+    path.write_bytes(gzip.compress(b"x\n1\n"))
+    source = FileSourceSpec(path=str(path), transforms=Pipeline(Gzip()), infer=infer)
+    if infer is True:
+        with pytest.raises(ValueError, match="infer"):
+            parse(source)
+    else:
+        assert parse(source, output="pydata")[0].data == [{"x": 1}]
+
+
+def test_glob_preserves_disabled_inference(tmp_path):
+    # A suffix alone must not override explicit caller configuration on children.
+    (tmp_path / "a.csv.gz").write_bytes(b"x\n1\n")
+    (tmp_path / "b.csv.gz").write_bytes(b"x\n2\n")
+    results = parse(
+        FileSourceSpec(path=str(tmp_path), glob="*.csv.gz", infer=False),
+        output="pydata",
+    )
+    assert [result.data for result in results] == [[{"x": 1}], [{"x": 2}]]
+
+
+def test_configured_gzip_reaches_inferred_reader(tmp_path):
+    from mountainash_transport import Gzip
+
+    class ObservedGzip(Gzip):
+        used = False
+
+        def unwrap(self, stream):
+            self.used = True
+            return super().unwrap(stream)
+
+    decoder = ObservedGzip()
+    path = tmp_path / "rows.csv.gz"
+    path.write_bytes(gzip.compress(b"x\n1\n"))
+    result = parse(FileSourceSpec(path=str(path), gzip=decoder), output="pydata")
+    assert result[0].data == [{"x": 1}]
+    assert decoder.used
 
 
 class TestParseLocalFile:

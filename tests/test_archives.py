@@ -76,6 +76,20 @@ def _zip_bytes(members: dict[str, bytes]) -> bytes:
     return buf.getvalue()
 
 
+@pytest.mark.parametrize("explicit_pipeline", [False, True])
+def test_archive_outer_gzip_options(tmp_path, explicit_pipeline):
+    from mountainash_transport import Gzip, Pipeline
+
+    path = tmp_path / "rows.zip.gz"
+    path.write_bytes(gzip.compress(_zip_bytes({"rows.csv": b"x\n1\n"})))
+    source = FileSourceSpec(
+        path=str(path), archive=ZipArchive(),
+        transforms=Pipeline(Gzip()) if explicit_pipeline else None,
+        infer=None if explicit_pipeline else True,
+    )
+    assert parse(source, output="pydata")[0].data == [{"x": 1}]
+
+
 def test_unrecognised_member_errors_by_default(tmp_path):
     path = tmp_path / "mixed.zip"
     path.write_bytes(_zip_bytes({"data.csv": b"a\n1\n", "README.xyz": b"hi"}))
