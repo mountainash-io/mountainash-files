@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, BinaryIO, assert_type
 
 import pyarrow as pa
+from mountainash_transport import GPG, Gzip
 
 from mountainash_files import (
     FileSourceSpec,
@@ -44,12 +45,16 @@ assert scalars == [1, 2]
 with TemporaryDirectory() as directory:
     path = Path(directory) / "rows.csv"
     path.write_bytes(wire)
-    source = FileSourceSpec(path=str(path))
+    source = FileSourceSpec(path=str(path), infer=False, gpg=GPG(), gzip=Gzip())
+    assert_type(source.infer, bool | None)
+    assert_type(source.gpg, GPG | None)
+    assert_type(source.gzip, Gzip | None)
     parsed = assert_type(parse(source), list[ParseResult])
     assert parsed[0].data.to_pylist() == [{"x": 1}]
     with stream(source) as reader:
         assert_type(reader, BinaryIO)
-        assert reader.read() == wire
+        assert reader.read(1) == wire[:1]
+        assert reader.read() == wire[1:]
     assert reader.closed
 
 if TYPE_CHECKING:
@@ -58,3 +63,6 @@ if TYPE_CHECKING:
     parse_bytes(b"x", CsvSpec(), output="invalid")  # type: ignore[arg-type]
     wrong: str = serialise_bytes(pa.table({"x": [1]}), CsvSpec())  # type: ignore[assignment]
     wrong_label: int = spec.label  # type: ignore[assignment]
+    FileSourceSpec(path="rows.csv", infer="yes")  # type: ignore[arg-type]
+    FileSourceSpec(path="rows.csv.gpg", gpg="keyring")  # type: ignore[arg-type]
+    FileSourceSpec(path="rows.csv.gz", gzip=True)  # type: ignore[arg-type]

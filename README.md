@@ -19,7 +19,7 @@ Tabular reads return Arrow tables by default, with Python records available on r
 | Format options | Immutable format specs for delimiters, headers, column selection and structured data | [Format options](examples/format_options/) |
 | Writing | Serialisation, format conversion and schema-checked Parquet append | [Writing](examples/#writing) |
 | File selection | Path templates, globs, missing-file handling and ZIP member selection | [Selecting files](examples/#selecting-files) |
-| Transport | Compression pipelines, byte copy, buffered streams and named storage profiles | [Storage and transforms](examples/#storage-and-transforms) |
+| Transport | Compression/encryption options, byte copy, delegated streams and named storage profiles | [Storage and transforms](examples/#storage-and-transforms) |
 | Extension | Register custom parsers and serialisers with `register_format()` | [Reference](docs/advanced-usage.md#custom-formats) |
 
 ## Installation
