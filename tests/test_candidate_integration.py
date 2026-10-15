@@ -37,7 +37,8 @@ def test_local_operations_with_migrated_profiles(tmp_path, monkeypatch, profile_
     assert results[0].data.to_pylist() == [{"value": 7}, {"value": 11}]
 
 
-def test_selected_store_profiles_work_after_owner_closes_store(tmp_path):
+@pytest.mark.parametrize("operation", ["parse", "stream"])
+def test_selected_store_profiles_work_after_owner_closes_store(tmp_path, operation):
     """Actual loopback HTTP proves resolved auth reaches files' transport I/O."""
     config = tmp_path / "profiles.yaml"
     config.write_text(
@@ -78,7 +79,12 @@ def test_selected_store_profiles_work_after_owner_closes_store(tmp_path):
                 path=f"http://127.0.0.1:{server.server_port}/data.csv",
                 storage_profile=profile, auth_profile=auth,
             )
-            assert parse(source)[0].data.to_pylist() == [{"value": 19}]
+            if operation == "parse":
+                assert parse(source)[0].data.to_pylist() == [{"value": 19}]
+            else:
+                with stream(source) as handle:
+                    assert handle.read() == b"value\n19\n"
+                assert handle.closed
         assert observed == ["Bearer first-token", "Bearer second-token", "Bearer first-token"]
     finally:
         server.shutdown()

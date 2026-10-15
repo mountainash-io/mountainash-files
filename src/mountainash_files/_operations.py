@@ -467,7 +467,9 @@ def stream(
 ) -> Iterator[BinaryIO]:
     """Return a raw byte stream from a source as a context manager.
 
-    Applies transforms (decompress/decrypt) but no format parsing.
+    Applies transforms (decompress/decrypt) but no format parsing. Delegates
+    consumption and seekability to transport; decoding can fail during reads.
+    The returned stream is closed when the context exits.
     """
     path = source.path
     if params:
@@ -476,13 +478,18 @@ def stream(
     storage_profile, auth_profile = _resolve_profiles(source)
 
     try:
-        data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
+        facade = _make_facade(path, storage_profile, auth_profile)
+        handle = facade.read_stream(
+            path, pipeline=source.transforms,
+            infer=_read_infer(source.transforms, source.infer),
+            gpg=source.gpg, gzip=source.gzip,
+        )
     except Exception as exc:
         if source.on_missing != "skip" or not _is_not_found(exc):
             raise
-        data = b""
-    with io.BytesIO(data) as buf:
-        yield buf
+        handle = io.BytesIO()
+    with handle:
+        yield handle
 
 
 def _is_not_found(exc: Exception) -> bool:

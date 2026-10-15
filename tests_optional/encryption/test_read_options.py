@@ -7,7 +7,7 @@ import gnupg
 import pytest
 from mountainash_transport import GPG
 
-from mountainash_files import FileSinkSpec, FileSourceSpec, copy, parse
+from mountainash_files import FileSinkSpec, FileSourceSpec, copy, parse, stream
 
 
 @pytest.fixture(scope="module")
@@ -54,3 +54,13 @@ def test_encrypted_glob_retains_key_configuration(encrypted_sources):
         output="pydata",
     )
     assert [result.data for result in results] == [[{"x": 1}], [{"x": 1}]]
+
+
+@pytest.mark.parametrize("suffix", [".gpg", ".gz.gpg"])
+def test_inferred_encryption_stream(encrypted_sources, suffix):
+    root, decoder = encrypted_sources
+    source = FileSourceSpec(path=str(root / ("rows.csv" + suffix)), gpg=decoder)
+    with stream(source) as handle:
+        assert handle.read(2) == b"x\n"
+        assert handle.read() == b"1\n"
+    assert handle.closed
