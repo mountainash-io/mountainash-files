@@ -1,4 +1,4 @@
-"""Copy compressed input to plain bytes and read it through a buffered stream."""
+"""Copy compressed input to plain bytes and consume a transport stream."""
 
 import tempfile
 from pathlib import Path
@@ -18,11 +18,11 @@ def main() -> None:
         copy(FileSourceSpec(path=source), FileSinkSpec(path=destination))
         assert Path(destination).read_bytes() == SALES
 
-        with stream(FileSourceSpec(path=source)) as buffer:
-            assert buffer.readline() == b"region,total\n"
-            remaining = buffer.read()
+        with stream(FileSourceSpec(path=source)) as reader:
+            assert reader.read(13) == b"region,total\n"
+            remaining = reader.read()
             assert remaining == b"north,120\nsouth,95\n"
-        assert buffer.closed
+        assert reader.closed
         print(f"copy: {len(SALES)} decoded bytes preserved")
         print(f"stream: header read, {len(remaining.splitlines())} data lines remain")
 

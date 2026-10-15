@@ -38,11 +38,18 @@ pytest-mock, and packaging installed. Optional dependencies are path-selected:
 python -m pytest tests_optional/xlsx
 # In a separate environment with mountainash-files[xml] installed:
 python -m pytest tests/test_xml.py tests_optional/xml
+# In a separate environment with mountainash-files[encryption], pytest,
+# and GnuPG (gpg and gpgconf) installed:
+python -m pytest tests_optional/encryption
 ```
 
 The XLSX fixture is tracked under `tests/fixtures`; core tests never generate it
 or require an XLSX engine. Optional cohorts fail if their declared dependency is
 missing rather than skipping unrelated tests. The
+encryption cohort creates a disposable local keyring and terminates its GPG agent;
+it exercises inferred GPG and combined gzip/GPG through parse, copy, stream and globs.
+It must pass for changes to transport read delegation; skipped encryption cases
+are not qualification. The
 `tests_optional/mountainash/test_relation.py` cohort additionally needs a
 compatible mountainash installation and belongs to subsequent consumer
 qualification; it is excluded from the default suite. Existing Hatch sibling

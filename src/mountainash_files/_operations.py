@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
     from mountainash_auth_client import AuthProfile
-    from mountainash_transport import StorageProfileProtocol
+    from mountainash_transport import GPG, Gzip, StorageProfileProtocol
 
 _VALID_OUTPUTS = ("arrow", "pydata")
 _logger = logging.getLogger(__name__)
@@ -100,26 +100,32 @@ def _make_facade(
     return StorageFacade.from_path(path, storage_profile, auth_profile=auth_profile)
 
 
+def _read_infer(transforms: Pipeline | None, infer: bool | None) -> bool:
+    """Use explicit inference policy, otherwise infer only without a pipeline."""
+    return transforms is None if infer is None else infer
+
+
 def _read_bytes(
     path: str,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
     transforms: Pipeline | None,
     *,
-    infer: bool = True,
+    infer: bool | None = None,
+    gpg: GPG | None = None,
+    gzip: Gzip | None = None,
 ) -> bytes:
     """Read bytes via transport, applying transforms (decompress/decrypt).
 
-    When infer=True and no explicit transforms, auto-detects compression
-    from path suffixes (.gz, .gpg). Disable infer when archive extraction
-    will handle decompression separately.
+    By default, infer transforms from suffixes unless a pipeline is explicit.
+    Archive extraction and append disable inference unless explicitly overridden
+    by the source. GPG inference requires a configured GPG instance.
     """
     facade = _make_facade(path, storage_profile, auth_profile)
-    if transforms is not None:
-        return facade.read(path, pipeline=transforms)
-    if infer:
-        return facade.read(path, infer=True)
-    return facade.read(path)
+    return facade.read(
+        path, pipeline=transforms, infer=_read_infer(transforms, infer),
+        gpg=gpg, gzip=gzip,
+    )
 
 
 def _write_bytes(
@@ -170,14 +176,12 @@ def parse(
         )
         results = []
         for file_path in paths:
-            child_source = FileSourceSpec(
+            child_source = dataclasses.replace(
+                source,
                 path=file_path,
-                format=source.format,
+                glob=None,
                 storage_profile=storage_profile,
                 auth_profile=auth_profile,
-                archive=source.archive,
-                transforms=source.transforms,
-                on_missing=source.on_missing,
             )
             results.extend(parse(child_source, output=output))
         return results
@@ -187,7 +191,9 @@ def parse(
     if source.archive is not None:
         try:
             raw = _read_bytes(
-                path, storage_profile, auth_profile, source.transforms, infer=False
+                path, storage_profile, auth_profile, source.transforms,
+                infer=False if source.infer is None else source.infer,
+                gpg=source.gpg, gzip=source.gzip,
             )
         except (FileNotFoundError, Exception) as exc:
             if source.on_missing == "skip" and _is_not_found(exc):
@@ -264,7 +270,10 @@ def parse(
         spec = get_spec_class(format_key)(**overrides)
 
     try:
-        data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
+        data = _read_bytes(
+            path, storage_profile, auth_profile, source.transforms,
+            infer=source.infer, gpg=source.gpg, gzip=source.gzip,
+        )
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
@@ -436,7 +445,10 @@ def copy(
     dst_profile, dst_auth = _resolve_profiles(sink)
 
     try:
-        data = _read_bytes(src_path, src_profile, src_auth, source.transforms)
+        data = _read_bytes(
+            src_path, src_profile, src_auth, source.transforms,
+            infer=source.infer, gpg=source.gpg, gzip=source.gzip,
+        )
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return
@@ -455,7 +467,9 @@ def stream(
 ) -> Iterator[BinaryIO]:
     """Return a raw byte stream from a source as a context manager.
 
-    Applies transforms (decompress/decrypt) but no format parsing.
+    Applies transforms (decompress/decrypt) but no format parsing. Delegates
+    consumption and seekability to transport; decoding can fail during reads.
+    The returned stream is closed when the context exits.
     """
     path = source.path
     if params:
@@ -464,13 +478,18 @@ def stream(
     storage_profile, auth_profile = _resolve_profiles(source)
 
     try:
-        data = _read_bytes(path, storage_profile, auth_profile, source.transforms)
+        facade = _make_facade(path, storage_profile, auth_profile)
+        handle = facade.read_stream(
+            path, pipeline=source.transforms,
+            infer=_read_infer(source.transforms, source.infer),
+            gpg=source.gpg, gzip=source.gzip,
+        )
     except Exception as exc:
         if source.on_missing != "skip" or not _is_not_found(exc):
             raise
-        data = b""
-    with io.BytesIO(data) as buf:
-        yield buf
+        handle = io.BytesIO()
+    with handle:
+        yield handle
 
 
 def _is_not_found(exc: Exception) -> bool:

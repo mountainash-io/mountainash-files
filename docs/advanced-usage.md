@@ -20,9 +20,18 @@ with `output="pydata"`; requesting Arrow for non-record scalar arrays raises
 `ParseError`. `ParseResult.data` is dynamically typed for plugin compatibility.
 
 `copy()` does not convert formats or append tables. To convert, parse then write
-the parsed table ([recipe](../examples/format_conversion/)). `stream()` currently
-reads the entire source into memory before yielding a `BytesIO`; it does not
-provide bounded-memory streaming.
+the parsed table ([recipe](../examples/format_conversion/)). Parsing and copying
+materialise bytes through transport's `read()`. `stream()` instead delegates to
+transport's `read_stream()` without first consuming the returned stream.
+
+Keep reads inside the context: the stream closes on normal exit or exceptions.
+Opening can fail, and decoding or I/O errors can also occur during consumption.
+`on_missing="skip"` handles missing sources while opening, not exceptions raised
+by your code or subsequent reads. Seekability follows the effective transformed
+stream: check `seekable()` before seeking; offsets refer to decoded bytes.
+Unlike the previous `BytesIO` implementation, seeking is not guaranteed for all
+backends. Transport's GPG transform and some backends still buffer internally,
+so this API does not promise bounded memory for every source.
 
 ## File specs and format selection
 
@@ -37,6 +46,15 @@ provide bounded-memory streaming.
 | `archive` | Read-side extraction with `ZipArchive` or `GzipCompression` |
 
 Sources additionally accept `glob` and `on_missing="raise"` or `"skip"`.
+Their read options apply consistently to parsing (including glob children),
+copying and streaming:
+
+| Source field | Meaning |
+|---|---|
+| `infer: bool \| None = None` | `None` preserves operation defaults; `True` enables suffix inference; `False` disables inference, not an explicit pipeline |
+| `gpg: GPG \| None = None` | Configured transport decoder for inferred `.gpg`, `.pgp` and `.asc` transforms |
+| `gzip: Gzip \| None = None` | Configured transport decoder for inferred `.gz` and `.gzip` transforms |
+
 Sinks accept `write_disposition="replace"` or `"append"` and `create_path=True`
 (create local parent directories). The `archive` field does not create an archive
 on write; use a transport transform for gzip output.
@@ -122,11 +140,38 @@ format or parse errors. Unknown suffixes are resolved before normal-file reads.
 
 ## Compression and storage
 
-Supply `transforms=Pipeline(Gzip())` to compress writes. Normal reads infer gzip
-from `.gz` when no explicit pipeline is supplied; an explicit pipeline takes
-precedence. Archive reads disable transport suffix inference so archive extraction
-can handle decompression. Append requires its explicit symmetric pipeline as
-described above. See [compression](../examples/gzip_pipeline/) and
+Supply `transforms=Pipeline(Gzip())` to compress writes. With `infer=None`, normal
+reads infer gzip from `.gz`/`.gzip` when no explicit pipeline is supplied; an
+explicit pipeline takes precedence. `infer=True` combined with `transforms`
+raises transport's `ValueError`. `infer=False` allows copying or streaming encoded
+bytes unchanged when no pipeline is supplied. `parse_bytes()` never applies
+transport transforms.
+
+Configure inferred decryption on the source, for example:
+
+```python
+from mountainash_files import FileSourceSpec, parse
+from mountainash_transport import GPG
+
+source = FileSourceSpec(
+    path="sales.csv.gz.gpg",
+    gpg=GPG(gnupghome="/path/to/keyring"),
+)
+results = parse(source)  # decrypt, decompress, then parse
+```
+
+GPG requires the encryption extra, GnuPG and appropriate keys. Without a configured
+GPG instance, inferred encrypted suffixes raise `ValueError`. For explicit pipelines,
+include every required transform, e.g. `Pipeline(GPG(...), Gzip())` for `.gz.gpg`;
+the `gpg`/`gzip` source options configure inference, not an explicit pipeline.
+
+Archive reads default to disabled inference so archive extraction can handle
+decompression. Override this with `infer=True` for an outer transport layer, e.g.
+`FileSourceSpec(path="data.zip.gz", archive=ZipArchive(), infer=True)`. An explicit
+pipeline also runs before archive extraction. Do not enable gzip inference when
+`archive=GzipCompression()` will unwrap that same layer.
+Append still requires its explicit symmetric sink pipeline as described above;
+source-only read options do not change writes. See [compression](../examples/gzip_pipeline/) and
 [byte operations](../examples/byte_operations/).
 
 Backend selection, storage/auth pairing and credentials are transport concerns.
