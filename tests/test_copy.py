@@ -2,6 +2,7 @@ import gzip
 from pathlib import Path
 
 import pytest
+from mountainash_transport import PathNotFoundError
 
 from mountainash_files import copy
 from mountainash_files.specs.source import FileSourceSpec
@@ -36,7 +37,7 @@ class TestCopyLocal:
     def test_copy_missing_raises(self):
         source = FileSourceSpec(path="/nonexistent/file.csv")
         sink = FileSinkSpec(path="/tmp/out.csv")
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(PathNotFoundError):
             copy(source, sink)
 
     def test_copy_missing_skip(self, tmp_path):
