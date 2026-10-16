@@ -179,7 +179,8 @@ def parse(
             return wrap(parser(data, spec))
 
         def on_source(path, storage_profile, auth_profile, src) -> ParseResult:
-            return wrap(_parse_with_access(parser, spec, format_key, path, storage_profile, auth_profile, src))
+            run = lambda data: parser(data, spec)  # noqa: E731
+            return wrap(_with_access(get_access(format_key, spec), run, path, storage_profile, auth_profile, src))
 
         return on_bytes, on_source
 
@@ -317,14 +318,6 @@ def _no_transforms(path: str, source: FileSourceSpec) -> bool:
         return True
     pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
     return pipeline is None or pipeline.is_empty()
-
-
-def _parse_with_access(parser, spec, format_key, path, storage_profile, auth_profile, source):
-    """Ranged handle when the format asks for it and no transforms apply; otherwise whole-object bytes."""
-    return _with_access(
-        get_access(format_key, spec), lambda data: parser(data, spec),
-        path, storage_profile, auth_profile, source,
-    )
 
 
 def _with_access(mode, run, path, storage_profile, auth_profile, source):

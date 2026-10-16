@@ -64,11 +64,12 @@ does not change later parses, and a changed source can parse differently.
 |---|---|
 | `metadata` | Read from format metadata (Parquet footer); no records inspected |
 | `full` | Every record was inspected |
-| `bounded` | Inference stopped before the end of the input; later fields or types may be missing |
+| `bounded` | Coverage of every record was not established; later fields or types may be missing |
 
 `infer_schema_rows=None` (the default) inspects every record. A positive integer
 bounds the data records inspected per selected input; header and comment records
-are not counted. A result is also `bounded` when the spec sets
+are not counted. If a CSV header row comes after the Nth data record, the records
+before it are read and also contribute. A result is also `bounded` when the spec sets
 `infer_sample_rows`. Other budget values raise `ValueError` before any I/O.
 
 A budget is the only cost control. What it saves depends on the format:
@@ -76,7 +77,7 @@ A budget is the only cost control. What it saves depends on the format:
 | Format | Fetched | Full budget | Finite budget |
 |---|---|---|---|
 | Parquet | Footer only (ranged reads; whole object with transforms or servers without ranges) | Metadata only | Same |
-| CSV / TSV, NDJSON | Whole object for a full budget; a prefix read forward and closed early for a finite one (whole object with transforms or archives) | About one parse | Only the prefix: fixed cost whatever the file size |
+| CSV / TSV, NDJSON | Whole object for a full budget; a prefix read forward and closed early for a finite one (whole object with transforms or archives) | About one parse | Only the prefix, so cost follows the budget, not the file size (UTF-16/32 NDJSON is read whole) |
 | JSON document | Whole object | About one parse | Still decodes the whole document |
 | XLSX | Whole workbook | About one parse | Still decodes the whole sheet; little faster than full |
 
@@ -84,7 +85,8 @@ For example, on one million rows a full CSV discovery took about 0.3 s and a
 1,000-record discovery about 0.05 s, fetching about 2.6 MB of 32 MB over HTTP.
 
 XML and plugins without an inspector raise `SchemaDiscoveryUnsupportedError`
-before reading, even with `on_missing="skip"`. Malformed content raises
+before reading a single file, even with `on_missing="skip"`; archive members
+are checked after the archive is read. Malformed content raises
 `ParseError`, including JSON whose selected records are not tabular. A caller's
 stream passed to `inspect_schema_bytes()` is read but not closed.
 

@@ -12,9 +12,6 @@ import pyarrow as pa
 
 from mountainash_files.formats._types import FormatSpec
 
-SEEN: list[object] = []
-
-
 @dataclasses.dataclass(frozen=True)
 class TypedSpec(FormatSpec):
     FORMAT: ClassVar[str] = "typed"
@@ -32,6 +29,5 @@ def typed_parse(data, spec):
 
 
 def typed_inspect(data, spec, *, infer_schema_rows=None):
-    SEEN.append(data)
     alias = _raw(data).decode().split(":")[0]
     return pa.schema([("v", pa.type_for_alias(alias))]), "metadata"

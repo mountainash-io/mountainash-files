@@ -240,8 +240,8 @@ def _csv_prefix(data: bytes | BinaryIO, spec: CsvSpec, n: int) -> tuple[bytes, b
             base = consumed
             for record, end in iter_logical_records(text[base:], spec):
                 end += base
-                if end == len(text) and not eof and not text.endswith(spec.line_terminator):
-                    break   # trailing record still arriving
+                if end == len(text) and not eof:
+                    break   # the last record may still be arriving (even after an escaped terminator)
                 consumed, number = end, number + 1
                 if record == "" or number in comment_rows or (
                         spec.comment_char is not None and record.startswith(spec.comment_char)):

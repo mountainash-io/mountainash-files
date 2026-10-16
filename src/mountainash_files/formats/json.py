@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json as _json
+import re
 from typing import Any, BinaryIO, ClassVar, Literal, cast
 
 import pyarrow as pa
@@ -110,38 +111,48 @@ def _array_rows(first_line: bytes, spec: JsonSpec) -> bool:
     return first_line.lstrip()[:1] == b"["
 
 
+_LINE_END = re.compile(rb"\r\n|\r|\n")   # the boundaries bytes.splitlines() uses in _decode_records
+
+
 def _ndjson_prefix(data: bytes | BinaryIO, spec: JsonSpec, n: int) -> tuple[bytes, bool]:
     """NDJSON through the Nth data line (an array header is extra), and whether the input ended there."""
     if isinstance(data, bytes):
-        buffer, eof = _utf8(data), True
+        buffer, eof, checked = _utf8(data), True, True
     else:
-        buffer, eof, size = b"", False, 65536
+        buffer, eof, checked, size = b"", False, False, 65536
     pos, lines, wanted = 0, 0, None
     while True:
         if not eof:
             chunk = data.read(size)   # type: ignore[union-attr]
             eof, size = not chunk, min(size * 2, 8 << 20)
             buffer += chunk
-            if eof or (not pos and _json.detect_encoding(buffer[:4]) != "utf-8"):
-                while not eof:   # UTF-16/32 NDJSON: line splitting needs the decoded text
+        if not checked and (len(buffer) >= 4 or eof):
+            checked = True
+            encoding = _json.detect_encoding(buffer[:4]) if buffer else "utf-8"
+            if encoding == "utf-8-sig":
+                pos = 3   # skip the BOM and keep reading incrementally
+            elif encoding != "utf-8":
+                while not eof:   # UTF-16/32: line splitting needs the decoded text
                     chunk = data.read(size)   # type: ignore[union-attr]
                     eof, buffer = not chunk, buffer + chunk
                 buffer = _utf8(buffer)
-        while True:
-            newline = buffer.find(b"\n", pos)
-            end = len(buffer) if newline < 0 and eof else newline + 1
-            if newline < 0 and not eof:
-                break
-            line = buffer[pos:end]
-            pos = end
+        if not checked:
+            continue
+        while pos < len(buffer):
+            match = _LINE_END.search(buffer, pos)
+            if match is None or (match.group() == b"\r" and match.end() == len(buffer) and not eof):
+                if not eof:
+                    break   # line, or a CRLF, still arriving
+                end = len(buffer)
+            else:
+                end = match.end()
+            line, pos = buffer[pos:end], end
             if line.strip():
                 if wanted is None:
                     wanted = n + (1 if spec.header and _array_rows(line, spec) else 0)
                 lines += 1
                 if lines == wanted:
                     return buffer[:pos], eof and not buffer[pos:].strip()
-            if pos >= len(buffer):
-                break
         if eof:
             return buffer, True
 

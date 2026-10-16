@@ -21,14 +21,12 @@ from mountainash_files.formats.json import JsonSpec
 from mountainash_files.formats.parquet import ParquetSpec
 from mountainash_files.formats.tsv import TsvSpec
 
-import _schema_plugin
 from _schema_plugin import TypedSpec, typed_inspect, typed_parse
 
 
 @pytest.fixture(autouse=True)
 def fresh_registry():
     _reset_registry()
-    _schema_plugin.SEEN.clear()
     yield
     _reset_registry()
 
@@ -115,6 +113,9 @@ def test_callable_inspector_is_dispatched():
     register_format(TypedSpec, typed_parse, schema_inspector=typed_inspect)
     result = inspect_schema_bytes(b"int16:7", "typed")
     assert result.schema == pa.schema([("v", pa.int16())]) and result.basis == "metadata"
+    borrowed = io.BytesIO(b"int32:3")
+    assert inspect_schema_bytes(borrowed, "typed").schema == pa.schema([("v", pa.int32())])
+    assert not borrowed.closed
 
 
 def test_lazy_inspector_does_not_import_parser_or_serialiser():
@@ -145,13 +146,6 @@ def test_reset_restores_builtin_discovery():
     _reset_registry()
     raw = _parquet(pa.schema([("v", pa.int64())]))
     assert inspect_schema_bytes(raw, "parquet").basis == "metadata"
-
-
-def test_plugin_receives_the_borrowed_stream():
-    register_format(TypedSpec, typed_parse, schema_inspector=typed_inspect)
-    stream = io.BytesIO(b"int32:3")
-    inspect_schema_bytes(stream, "typed")
-    assert _schema_plugin.SEEN == [stream]
 
 
 def test_schema_access_is_validated():
@@ -343,3 +337,42 @@ def test_xlsx_discovery_without_the_extra_raises_missing_dependency(monkeypatch)
     monkeypatch.setitem(sys.modules, "fastexcel", None)   # import fails as if the extra were absent
     with pytest.raises(MissingDependencyError):
         inspect_schema_bytes(b"PK\x03\x04 not inspected", "xlsx", infer_schema_rows=1)
+
+
+class Chunks(io.RawIOBase):
+    """Returns the given chunks one read at a time and counts reads."""
+
+    def __init__(self, parts: list[bytes]):
+        self.parts, self.reads = list(parts), 0
+
+    def readable(self):
+        return True
+
+    def read(self, n=-1):
+        self.reads += 1
+        return self.parts.pop(0) if self.parts else b""
+
+
+def test_csv_escaped_terminator_at_a_chunk_end_is_not_a_record_end():
+    spec = CsvSpec(quote_char=None, escape_char="\\")
+    wire = [b"a,b\n1\\\n", b",x\n2,y\n"]
+    streamed = inspect_schema_bytes(Chunks(wire), spec, infer_schema_rows=1)
+    assert streamed.schema == inspect_schema_bytes(b"".join(wire), spec, infer_schema_rows=1).schema
+
+
+@pytest.mark.parametrize("separator", [b"\r", b"\r\n", b"\n"])
+def test_ndjson_budget_counts_every_line_separator(separator):
+    wire = separator.join([b"[1]", b"[2.5]", b""])
+    result = inspect_schema_bytes(wire, JsonSpec(ndjson=True, header=False), infer_schema_rows=1)
+    assert result.schema == pa.schema([("field1", pa.int64())]) and result.basis == "bounded"
+
+
+def test_ndjson_crlf_split_across_chunks():
+    result = inspect_schema_bytes(Chunks([b'{"a":1}\r', b'\n{"a":"x"}\n']), JsonSpec(ndjson=True), infer_schema_rows=1)
+    assert result.schema == pa.schema([("a", pa.int64())])
+
+
+def test_bom_ndjson_stream_reads_only_a_prefix():
+    stream = Chunks([b'\xef\xbb\xbf{"a":1}\n'] + [b'{"a":"x"}\n'] * 100)
+    result = inspect_schema_bytes(stream, JsonSpec(ndjson=True), infer_schema_rows=1)
+    assert result.schema == pa.schema([("a", pa.int64())]) and stream.reads < 5
