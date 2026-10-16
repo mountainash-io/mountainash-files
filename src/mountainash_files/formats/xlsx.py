@@ -28,6 +28,15 @@ class XlsxSpec(FormatSpec):
     comment_rows: tuple[int, ...] = ()
     comment_char: str | None = None
     engine: Literal["auto", "fastexcel", "openpyxl"] = "auto"
+    temporal: Literal["infer", "text"] = "infer"
+    infer_sample_rows: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.temporal not in ("infer", "text"):
+            raise ValueError("temporal must be 'infer' or 'text'")
+        n = self.infer_sample_rows
+        if n is not None and (isinstance(n, bool) or not isinstance(n, int) or n < 1):
+            raise ValueError("infer_sample_rows must be a positive int or None")
 
 
 def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
@@ -36,8 +45,22 @@ def xlsx_parse(data: bytes | BinaryIO, spec: XlsxSpec) -> pa.Table:
     raw = data.read() if hasattr(data, "read") else data
     if not raw:
         raise ParseError("xlsx", "Empty input")
-    if spec.engine == "fastexcel":
-        raise MissingDependencyError("fastexcel raw-row spreadsheet parsing", "xlsx")
+    if spec.engine != "openpyxl":
+        try:
+            import fastexcel  # noqa: F401
+            import openpyxl  # noqa: F401
+        except ImportError as exc:
+            raise MissingDependencyError("XLSX parsing", "xlsx") from exc
+        from mountainash_files.formats._engines import infer_temporal, normalise_types
+        from mountainash_files.formats._xlsx_calamine import read_calamine
+
+        try:
+            table = normalise_types(read_calamine(raw, spec))
+        except ParseError:
+            raise
+        except Exception as exc:  # CalamineError, SheetNotFoundError, conversion errors
+            raise ParseError("xlsx", str(exc)) from exc
+        return infer_temporal(table) if spec.temporal == "infer" else table
     try:
         import openpyxl
         from openpyxl.worksheet._read_only import ReadOnlyWorksheet
