@@ -21,11 +21,12 @@ classifiers = [
 ]
 dependencies = [
     "pyarrow>=16",
+    "polars>=2.0,<3",
     "mountainash-transport>=0.1.0,<0.2",
 ]
 
 [project.optional-dependencies]
-xlsx = ["fastexcel>=0.12", "openpyxl>=3.1"]
+xlsx = ["fastexcel>=0.21,<0.22", "openpyxl>=3.1"]
 xml = ["lxml>=4.9"]
 s3 = ["mountainash-transport[s3]>=0.1.0,<0.2"]
 gcs = ["mountainash-transport[gcs]>=0.1.0,<0.2"]

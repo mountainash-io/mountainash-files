@@ -60,7 +60,7 @@ dependencies = [
     "pytest-cov>=4.1.0",
     "pytest-clarity>=1.0.1",
     "openpyxl>=3.1",
-    "fastexcel>=0.12",
+    "fastexcel>=0.21,<0.22",
     "lxml>=4.9",
 
     "mountainash_settings @    {root:uri}/temp/mountainash-settings",
@@ -75,11 +75,10 @@ cov = "pytest --cov --junitxml=junit.xml -o junit_family=legacy --cov-report=xml
 # Env: test
 #================
 [[envs.test.matrix]]
-python = ["3.12"]
+python = ["3.12", "3.13"]
 
 [envs.test]
 installer = "uv"
-path = ".hatch/test"
 dependencies = [
     "pytest==8.3.5",
     "pytest-check==2.5.3",
@@ -87,12 +86,18 @@ dependencies = [
     "pytest-cov>=4.1.0",
     "pytest-clarity>=1.0.1",
     "openpyxl>=3.1",
-    "fastexcel>=0.12",
+    "fastexcel>=0.21,<0.22",
     "lxml>=4.9",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
     "mountainash_transport @   {root:uri}/../mountainash-transport",
 ]
+[envs.test.overrides]
+matrix.python.path = [
+    { value = ".hatch/test-py3.12", if = ["3.12"] },
+    { value = ".hatch/test-py3.13", if = ["3.13"] },
+]
+
 [envs.test.scripts]
 test = "pytest"
 cov = "pytest --cov --cov-report=term-missing"
