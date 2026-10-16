@@ -82,7 +82,7 @@ Import format specs from their corresponding modules:
 | `TsvSpec` | `mountainash_files.formats.tsv` | CSV options with a tab delimiter by default |
 | `JsonSpec` | `mountainash_files.formats.json` | `property`, `item_type`, `item_keys`, `header`, `ndjson`, `temporal`, `infer_sample_rows` |
 | `ParquetSpec` | `mountainash_files.formats.parquet` | `columns` |
-| `XlsxSpec` | `mountainash_files.formats.xlsx` | `sheet_name`, `sheet_number`, `engine`, header and row options, `temporal`, `infer_sample_rows` |
+| `XlsxSpec` | `mountainash_files.formats.xlsx` | `sheet_name`, `sheet_number`, header and row options, `temporal`, `infer_sample_rows` |
 | `XmlSpec` | `mountainash_files.formats.xml` | `xpath`, `encoding` |
 
 See the [format-options recipe](../examples/format_options/) for explicit CSV

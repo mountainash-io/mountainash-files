@@ -10,7 +10,7 @@ the differences below.
 |---|---|
 | CSV / TSV | pyarrow CSV |
 | JSON / NDJSON | polars |
-| XLSX | fastexcel (calamine); `engine="openpyxl"` keeps the previous reader |
+| XLSX | fastexcel (calamine); the `engine` option and the openpyxl reader are removed |
 | Parquet | pyarrow `ParquetFile` |
 | XML | lxml (unchanged) |
 
@@ -76,14 +76,6 @@ JsonSpec(ndjson=True, infer_sample_rows=1000)
 > different type raises `ParseError`. Leave `infer_sample_rows` unset unless you
 > know the schema is uniform.
 
-To keep the previous XLSX reader (openpyxl cell types, no calamine behaviour):
-
-```python
-from mountainash_files.formats.xlsx import XlsxSpec
-
-XlsxSpec(engine="openpyxl")
-```
-
 ## Remote Parquet
 
 When `ParquetSpec(columns=...)` selects part of a file, files requests a ranged
@@ -122,4 +114,4 @@ must handle both and must finish reading before it returns.
 ## Dependencies
 
 polars 2.x is now a core dependency. The `xlsx` extra pins `fastexcel>=0.21,<0.22`
-and `openpyxl>=3.1`.
+and `openpyxl>=3.1` (used only to read XLSX header labels).
