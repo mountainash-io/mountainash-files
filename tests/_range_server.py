@@ -76,8 +76,14 @@ def serve(files: dict[str, bytes], *, ranges: bool = True, etag_changes: bool = 
             if status == 206:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
             self.end_headers()
-            self.wfile.write(body)
-            self._record("GET", header, status, len(body))
+            written = 0
+            try:
+                for offset in range(0, len(body), 65536):   # chunked, so an early close is measurable
+                    self.wfile.write(body[offset:offset + 65536])
+                    written += len(body[offset:offset + 65536])
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+            self._record("GET", header, status, written)
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     worker = threading.Thread(target=server.serve_forever, daemon=True)

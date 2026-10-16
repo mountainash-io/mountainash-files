@@ -7,6 +7,7 @@ from mountainash_files._exceptions import (
 )
 from mountainash_files._operations import (
     copy,
+    inspect_schema,
     inspect_schema_bytes,
     parse,
     parse_bytes,
@@ -37,6 +38,7 @@ __all__ = [
     "copy",
     "parse",
     "parse_bytes",
+    "inspect_schema",
     "inspect_schema_bytes",
     "serialise_bytes",
     "stream",

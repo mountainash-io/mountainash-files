@@ -48,32 +48,31 @@ def _unpack_zip(data: bytes, archive: ZipArchive) -> Iterator[tuple[str, bytes]]
     except Exception as exc:
         raise ArchiveExtractionError(f"Invalid ZIP file: {exc}") from exc
 
-    names = [n for n in zf.namelist() if not n.endswith("/")]
+    with zf:
+        names = [n for n in zf.namelist() if not n.endswith("/")]
 
-    if archive.file_pattern != "*":
-        names = [n for n in names if fnmatch.fnmatch(n, archive.file_pattern)]
+        if archive.file_pattern != "*":
+            names = [n for n in names if fnmatch.fnmatch(n, archive.file_pattern)]
 
-    if not names:
-        raise ArchiveEmptyMatchError(
-            f"No members matched pattern {archive.file_pattern!r}"
-        )
+        if not names:
+            raise ArchiveEmptyMatchError(
+                f"No members matched pattern {archive.file_pattern!r}"
+            )
 
-    if archive.sort_order == "name":
-        names.sort()
+        if archive.sort_order == "name":
+            names.sort()
 
-    pwd = None
-    if archive.password is not None:
-        if isinstance(archive.password, str):
-            pwd = archive.password.encode("utf-8")
-        elif hasattr(archive.password, "get_secret_value"):
-            pwd = archive.password.get_secret_value().encode("utf-8")
-        elif hasattr(archive.password, "resolve"):
-            pwd = archive.password.resolve().encode("utf-8")
+        pwd = None
+        if archive.password is not None:
+            if isinstance(archive.password, str):
+                pwd = archive.password.encode("utf-8")
+            elif hasattr(archive.password, "get_secret_value"):
+                pwd = archive.password.get_secret_value().encode("utf-8")
+            elif hasattr(archive.password, "resolve"):
+                pwd = archive.password.resolve().encode("utf-8")
 
-    for name in names:
-        member_data = zf.read(name, pwd=pwd)
-        if archive.inner is not None and isinstance(archive.inner, GzipCompression):
-            member_data = gzip.decompress(member_data)
-        yield (name, member_data)
-
-    zf.close()
+        for name in names:
+            member_data = zf.read(name, pwd=pwd)
+            if archive.inner is not None and isinstance(archive.inner, GzipCompression):
+                member_data = gzip.decompress(member_data)
+            yield (name, member_data)

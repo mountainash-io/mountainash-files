@@ -22,6 +22,7 @@ from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
 from mountainash_files.formats._registry import (
     get_access,
     get_parser,
+    get_schema_access,
     get_schema_inspector,
     get_serialiser,
     get_spec_class,
@@ -167,6 +168,34 @@ def parse(
     Always returns a list of ParseResult, even for single files.
     """
     _check_output(output)
+
+    def make(format_key: str, spec: FormatSpec):
+        parser = get_parser(format_key)
+
+        def wrap(data: Any) -> ParseResult:
+            return ParseResult(data=_normalise_output(data, output, spec), format_key=format_key, spec=spec)
+
+        def on_bytes(data: bytes) -> ParseResult:
+            return wrap(parser(data, spec))
+
+        def on_source(path, storage_profile, auth_profile, src) -> ParseResult:
+            return wrap(_parse_with_access(parser, spec, format_key, path, storage_profile, auth_profile, src))
+
+        return on_bytes, on_source
+
+    return _read_source(source, params=params, make=make)
+
+
+_Make = t.Callable[[str, FormatSpec], tuple[t.Callable[[bytes], Any], t.Callable[..., Any]]]
+
+
+def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make: _Make) -> list:
+    """Shared source traversal for parse and schema discovery.
+
+    ``make(format_key, spec)`` resolves the format's callable before any I/O and returns
+    ``(on_bytes, on_source)``: archive members are handed over as bytes; a single file is
+    acquired by ``on_source(path, storage_profile, auth_profile, source)``.
+    """
     path = source.path
     if params:
         path = path.format(**params)
@@ -192,11 +221,11 @@ def parse(
                 storage_profile=storage_profile,
                 auth_profile=auth_profile,
             )
-            results.extend(parse(child_source, output=output))
+            results.extend(_read_source(child_source, params=None, make=make))
         return results
 
     # Archive path: read raw bytes (no suffix inference — archive handles decompression),
-    # then extract members, then parse each.
+    # then extract members, then hand each to the format.
     if source.archive is not None:
         try:
             raw = _read_bytes(
@@ -244,13 +273,8 @@ def parse(
                     f"format ({exc}); scope members with file_pattern or set "
                     "on_unrecognised='skip'",
                 ) from exc
-            parser = get_parser(fmt_key)
-            result_data = _normalise_output(
-                parser(member_data, fmt_spec), output, fmt_spec
-            )
-            results.append(
-                ParseResult(data=result_data, format_key=fmt_key, spec=fmt_spec)
-            )
+            on_bytes, _ = make(fmt_key, fmt_spec)
+            results.append(on_bytes(member_data))
         if not results:
             raise ParseError(
                 "archive",
@@ -268,28 +292,21 @@ def parse(
     if isinstance(source.format, FormatSpec):
         format_key = source.format.FORMAT
         spec = source.format
-        matched_suffix = None
     elif isinstance(source.format, str):
         format_key, matched_suffix = resolve_format(format=source.format)
-        overrides = get_suffix_overrides(matched_suffix)
-        spec = get_spec_class(format_key)(**overrides)
+        spec = get_spec_class(format_key)(**get_suffix_overrides(matched_suffix))
     else:
         format_key, matched_suffix = resolve_format(path=path)
-        overrides = get_suffix_overrides(matched_suffix)
-        spec = get_spec_class(format_key)(**overrides)
+        spec = get_spec_class(format_key)(**get_suffix_overrides(matched_suffix))
 
-    parser = get_parser(format_key)
+    _, on_source = make(format_key, spec)
     try:
-        parsed = _parse_with_access(
-            parser, spec, format_key, path, storage_profile, auth_profile, source
-        )
+        result = on_source(path, storage_profile, auth_profile, source)
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
         raise
-    result_data = _normalise_output(parsed, output, spec)
-
-    return [ParseResult(data=result_data, format_key=format_key, spec=spec)]
+    return [result]
 
 
 def _no_transforms(path: str, source: FileSourceSpec) -> bool:
@@ -304,25 +321,72 @@ def _no_transforms(path: str, source: FileSourceSpec) -> bool:
 
 def _parse_with_access(parser, spec, format_key, path, storage_profile, auth_profile, source):
     """Ranged handle when the format asks for it and no transforms apply; otherwise whole-object bytes."""
-    if get_access(format_key, spec) == "random" and _no_transforms(path, source):
+    return _with_access(
+        get_access(format_key, spec), lambda data: parser(data, spec),
+        path, storage_profile, auth_profile, source,
+    )
+
+
+def _with_access(mode, run, path, storage_profile, auth_profile, source):
+    """Hand *run* a transport handle in *mode* ('random'/'sequential') when no transforms apply.
+
+    Whole-object bytes otherwise, and when the backend refuses the mode. The handle is
+    closed when *run* returns or raises.
+    """
+    if mode != "bytes" and _no_transforms(path, source):
         facade = _make_facade(path, storage_profile, auth_profile)
         try:
             handle = facade.read_stream(
                 path, pipeline=source.transforms,
                 infer=_read_infer(source.transforms, source.infer),
                 gpg=source.gpg, gzip=source.gzip,
-                access="random", range_policy=None,
+                access=mode, range_policy=None,
             )
         except (RangeNotSupportedError, UnsupportedOperationError):
             handle = None
         if handle is not None:
             with handle:
-                return parser(handle, spec)
+                return run(handle)
     data = _read_bytes(
         path, storage_profile, auth_profile, source.transforms,
         infer=source.infer, gpg=source.gpg, gzip=source.gzip,
     )
-    return parser(data, spec)
+    return run(data)
+
+
+def inspect_schema(
+    source: FileSourceSpec,
+    *,
+    params: dict[str, Any] | None = None,
+    infer_schema_rows: int | None = None,
+) -> list[SchemaResult]:
+    """Observe the Arrow schema of each selected input without returning its rows.
+
+    Selection (templates, globs, archives, transforms, profiles, missing files) follows
+    :func:`parse`. ``infer_schema_rows`` bounds the data records used per selected input;
+    ``None`` uses every record. Results are observations, not a contract on later parses.
+    """
+    _check_budget(infer_schema_rows)
+    n = infer_schema_rows
+
+    def make(format_key: str, spec: FormatSpec):
+        inspector = get_schema_inspector(format_key)   # unsupported formats fail before any I/O
+
+        def wrap(found: tuple[Any, t.Literal["metadata", "full", "bounded"]]) -> SchemaResult:
+            schema, basis = found
+            return SchemaResult(schema=schema, basis=basis, format_key=format_key, spec=spec)
+
+        def on_bytes(data: bytes) -> SchemaResult:
+            return wrap(inspector(data, spec, infer_schema_rows=n))
+
+        def on_source(path, storage_profile, auth_profile, src) -> SchemaResult:
+            mode = get_schema_access(format_key, spec, n)
+            run = lambda data: inspector(data, spec, infer_schema_rows=n)  # noqa: E731
+            return wrap(_with_access(mode, run, path, storage_profile, auth_profile, src))
+
+        return on_bytes, on_source
+
+    return _read_source(source, params=params, make=make)
 
 
 def _append_table(data: Any) -> pa.Table:
