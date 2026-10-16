@@ -16,6 +16,7 @@ Tabular reads return Arrow tables by default, with Python records available on r
 | Area | Capabilities | Explore |
 |---|---|---|
 | Parsing | Suffix-based format selection; Arrow tables or Python records; in-memory buffers | [Parsing](examples/#parsing) |
+| Schema discovery | Arrow schema of each selected input without returning rows; full or bounded inference | [Reference](docs/advanced-usage.md#schema-discovery) |
 | Format options | Immutable format specs for delimiters, headers, column selection and structured data | [Format options](examples/format_options/) |
 | Writing | Serialisation, format conversion and schema-checked Parquet append | [Writing](examples/#writing) |
 | File selection | Path templates, globs, missing-file handling and ZIP member selection | [Selecting files](examples/#selecting-files) |
@@ -89,13 +90,13 @@ Use `output="pydata"` for Python records. The suffix selects the format;
 
 ## Supported formats and storage
 
-| Format | Parse | Serialise | Append | Dependency |
-|---|---|---|---|---|
-| CSV / TSV | ✓ | ✓ | — | core |
-| JSON / NDJSON | ✓ | ✓ | — | core |
-| Parquet | ✓ | ✓ | ✓ | core |
-| XLSX | ✓ | — | — | `[xlsx]` |
-| XML | ✓ | ✓ | — | core; `[xml]` for lxml |
+| Format | Parse | Schema discovery | Serialise | Append | Dependency |
+|---|---|---|---|---|---|
+| CSV / TSV | ✓ | ✓ | ✓ | — | core |
+| JSON / NDJSON | ✓ | ✓ | ✓ | — | core |
+| Parquet | ✓ | ✓ (footer) | ✓ | ✓ | core |
+| XLSX | ✓ | ✓ | — | — | `[xlsx]` |
+| XML | ✓ | — | ✓ | — | core; `[xml]` for lxml |
 
 Append reads and rewrites the complete table, requires matching ordered column
 names and Arrow types, and is intended for a single writer. See
