@@ -22,13 +22,14 @@ from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
 from mountainash_files.formats._registry import (
     get_access,
     get_parser,
+    get_schema_inspector,
     get_serialiser,
     get_spec_class,
     get_suffix_overrides,
     resolve_format,
 )
 from mountainash_files.formats._exceptions import ParseError
-from mountainash_files.formats._types import FormatSpec, ParseResult
+from mountainash_files.formats._types import FormatSpec, ParseResult, SchemaResult
 from mountainash_files.specs.base import FileSpec
 from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files.specs.source import FileSourceSpec
@@ -568,6 +569,33 @@ def parse_bytes(
     parser = get_parser(format_key)
     result_data = _normalise_output(parser(data, spec), output, spec)
     return ParseResult(data=result_data, format_key=format_key, spec=spec)
+
+
+def _check_budget(infer_schema_rows: Any) -> None:
+    """A schema budget is None (every record) or a positive int; checked before any I/O."""
+    if infer_schema_rows is None:
+        return
+    if isinstance(infer_schema_rows, bool) or not isinstance(infer_schema_rows, int) or infer_schema_rows < 1:
+        raise ValueError(f"infer_schema_rows must be a positive int or None, got {infer_schema_rows!r}")
+
+
+def inspect_schema_bytes(
+    data: bytes | BinaryIO,
+    format: str | FormatSpec,
+    *,
+    infer_schema_rows: int | None = None,
+) -> SchemaResult:
+    """Observe the Arrow schema of an in-memory buffer without returning its rows.
+
+    ``infer_schema_rows=None`` infers from every record; a positive int bounds the data
+    records used. A caller's stream is borrowed: it is read but not closed.
+    """
+    _check_budget(infer_schema_rows)
+    format_key, spec = _resolve_format_spec(format)
+    inspector = get_schema_inspector(format_key)
+    schema, basis = inspector(data, spec, infer_schema_rows=infer_schema_rows)
+    return SchemaResult(schema=schema, basis=basis, format_key=format_key, spec=spec)
+
 
 
 def serialise_bytes(data: Any, format: str | FormatSpec) -> bytes:
