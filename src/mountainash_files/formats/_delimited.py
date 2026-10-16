@@ -56,19 +56,22 @@ def _lex(text: str, spec: CsvSpec) -> Iterator[tuple[str, str, str, bool]]:
         raise ParseError(spec.FORMAT, "unterminated quoted field")
 
 
-def scan_logical_records(text: str, spec: "CsvSpec") -> tuple[str, ...]:
-    """Split only at unquoted, unescaped line terminators."""
-    records: list[str] = []
+def iter_logical_records(text: str, spec: "CsvSpec") -> Iterator[tuple[str, int]]:
+    """Yield (record, end_offset), splitting only at unquoted, unescaped terminators.
+
+    end_offset is the index in *text* just after the record's terminator, or len(text).
+    """
     current: list[str] = []
+    position = 0
     for kind, raw, _, _ in _lex(text, spec):
+        position += len(raw)
         if kind == "record":
-            records.append("".join(current))
+            yield "".join(current), position
             current = []
         else:
             current.append(raw)
     if current:
-        records.append("".join(current))
-    return tuple(records)
+        yield "".join(current), position
 
 
 def remove_comment_records(
@@ -84,32 +87,32 @@ def remove_comment_records(
     return tuple(retained)
 
 
-def tokenize_record(record: str, spec: "CsvSpec") -> tuple[str | None, ...]:
-    """Apply delimiter, quote, escaping, initial-space, and null handling."""
-    values: list[str | None] = []
+def tokenize_record_quoted(record: str, spec: "CsvSpec") -> tuple[tuple[str, bool], ...]:
+    """Fields as (text, was_quoted); no null normalisation."""
+    values: list[tuple[str, bool]] = []
     field: list[str] = []
+    quoted_field = False
     at_start = True
     for kind, raw, value, quoted in _lex(record, spec):
         if kind == "delimiter":
-            values.append(_normalize_field("".join(field), spec))
-            field = []
-            at_start = True
+            values.append(("".join(field), quoted_field))
+            field, quoted_field, at_start = [], False, True
         elif kind == "quote":
-            at_start = False
+            quoted_field, at_start = True, False
         elif kind == "record":
             raise ParseError(spec.FORMAT, "unescaped record terminator inside record")
         else:
-            if (
-                at_start
-                and not quoted
-                and raw == value == " "
-                and spec.skip_initial_space
-            ):
+            if at_start and not quoted and raw == value == " " and spec.skip_initial_space:
                 continue
             field.append(value)
             at_start = False
-    values.append(_normalize_field("".join(field), spec))
+    values.append(("".join(field), quoted_field))
     return tuple(values)
+
+
+def tokenize_record(record: str, spec: "CsvSpec") -> tuple[str | None, ...]:
+    """Field values with today's null_sequence semantics (used for header labels)."""
+    return tuple(_normalize_field(text, spec) for text, _ in tokenize_record_quoted(record, spec))
 
 
 def _normalize_field(value: str, spec: "CsvSpec") -> str | None:

@@ -11,7 +11,7 @@
 | `write(sink, data, *, params=None)` | `None` | Serialise data and write it; raw `bytes` bypass format handling |
 | `serialise_bytes(data, format)` | `bytes` | Serialise without storage access |
 | `copy(source, sink, *, params=None)` | `None` | Copy bytes, applying source and sink transforms |
-| `stream(source, *, params=None)` | context manager yielding a binary stream | Read transformed bytes without parsing |
+| `stream(source, *, params=None, access="sequential", range_policy=None)` | context manager yielding a binary stream | Read transformed bytes without parsing |
 
 `ParseResult` contains `data`, `format_key`, `spec` and `skipped_members`.
 Tabular results default to Arrow tables; `output="pydata"` returns Python records.
@@ -32,6 +32,12 @@ stream: check `seekable()` before seeking; offsets refer to decoded bytes.
 Unlike the previous `BytesIO` implementation, seeking is not guaranteed for all
 backends. Transport's GPG transform and some backends still buffer internally,
 so this API does not promise bounded memory for every source.
+
+`access` (`"sequential"`, `"random"` or `"buffered"`) and `range_policy` pass to
+transport unchanged. `stream()` does not fall back: if transport refuses the
+combination (for example `access="random"` with a transform, or a server without
+byte ranges), the error propagates. Use `access="random"` for seekable ranged
+reads of remote objects. `parse()` chooses the access mode itself, per format.
 
 ## File specs and format selection
 
@@ -72,11 +78,11 @@ Import format specs from their corresponding modules:
 
 | Spec | Import module | Selected options |
 |---|---|---|
-| `CsvSpec` | `mountainash_files.formats.csv` | `delimiter`, `header_rows`, `comment_char`, `null_sequence`, `columns`, `dtypes` |
+| `CsvSpec` | `mountainash_files.formats.csv` | `delimiter`, `header_rows`, `comment_char`, `null_sequence`, `columns`, `dtypes`, `temporal` |
 | `TsvSpec` | `mountainash_files.formats.tsv` | CSV options with a tab delimiter by default |
-| `JsonSpec` | `mountainash_files.formats.json` | `property`, `item_type`, `item_keys`, `header`, `ndjson` |
+| `JsonSpec` | `mountainash_files.formats.json` | `property`, `item_type`, `item_keys`, `header`, `ndjson`, `temporal`, `infer_sample_rows` |
 | `ParquetSpec` | `mountainash_files.formats.parquet` | `columns` |
-| `XlsxSpec` | `mountainash_files.formats.xlsx` | `sheet_name`, `sheet_number`, `engine`, header and row options |
+| `XlsxSpec` | `mountainash_files.formats.xlsx` | `sheet_name`, `sheet_number`, `engine`, header and row options, `temporal`, `infer_sample_rows` |
 | `XmlSpec` | `mountainash_files.formats.xml` | `xpath`, `encoding` |
 
 See the [format-options recipe](../examples/format_options/) for explicit CSV
@@ -86,9 +92,10 @@ CSV/TSV serialisation preserves representable lexical values, including delimite
 quotes and embedded line breaks. Unrepresentable values raise `WriteError` before
 the destination is written. Set `null_sequence` to represent nulls explicitly;
 non-null values (including column names) equal to that marker are rejected.
-Without a null marker, nulls retain the empty-field representation. Parsing keeps
-ordinary type inference, so lexical preservation does not promise Arrow type
-round-tripping. TSV uses tabs by default and does not support append.
+Without a null marker, nulls retain the empty-field representation. Parsing infers
+`int64`, `double`, `bool`, `date32`, `timestamp[s]` and `string` columns, so lexical
+preservation does not promise Arrow type round-tripping. See
+[reader engines](migration-reader-engines.md) for inference controls. TSV uses tabs by default and does not support append.
 
 ## Write modes
 
@@ -184,6 +191,11 @@ then call `register_format(MySpec, parser, serialiser=serialiser)`. A parser
 accepts bytes or a binary stream plus the spec; a serialiser accepts data plus
 the spec and returns bytes. Serialisers are optional for read-only formats.
 Non-tabular formats should set `TABULAR = False` to retain their payload type.
+
+`register_format(..., access="random")` asks `parse()` for a seekable ranged
+handle when no transforms apply; the parser then receives a handle or `bytes`
+and must finish reading before it returns. See the
+[migration notes](migration-reader-engines.md#plugin-formats).
 
 Registrations reject conflicting keys, suffixes and media types unless
 `override=True` is explicit. Lazy registrations accept `"package.module:attr"`

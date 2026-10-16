@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import dataclasses
-import re
-from typing import BinaryIO, ClassVar, Sequence
+from typing import BinaryIO, ClassVar, Literal
 
 import pyarrow as pa
+import pyarrow.csv as pacsv
 
 from mountainash_files._exceptions import WriteError
 from mountainash_files.formats._delimited import (
     _validate_delimited_spec,
     encode_record,
+    iter_logical_records,
     remove_comment_records,
-    scan_logical_records,
     tokenize_record,
+    tokenize_record_quoted,
 )
+from mountainash_files.formats._engines import native_buffer
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._rows import apply_header_plan
@@ -41,54 +43,165 @@ class CsvSpec(FormatSpec):
     encoding: str = "utf-8"
     columns: tuple[str, ...] | None = None
     dtypes: tuple[tuple[str, str], ...] | None = None
+    temporal: Literal["infer", "text"] = "infer"
+
+    def __post_init__(self) -> None:
+        if self.temporal not in ("infer", "text"):
+            raise ValueError(f"temporal must be 'infer' or 'text', got {self.temporal!r}")
+
+
+def _positions(spec: CsvSpec) -> tuple[int, ...]:
+    return tuple(sorted(set(spec.header_rows))) or (1,)   # apply_header_plan's own default
+
+
+def _ascii1(value: str | None) -> bool:
+    return value is None or (len(value) == 1 and value.isascii())
+
+
+def _breaks_safe(data: bytes, terminator: str) -> bool:
+    if terminator == "\n":
+        return b"\r" not in data
+    if terminator == "\r\n":
+        return data.count(b"\r") == data.count(b"\r\n") == data.count(b"\n")
+    if terminator == "\r":
+        return b"\n" not in data
+    return False
+
+
+def _quotes_balanced(data: bytes, spec: CsvSpec) -> bool:
+    """Even quote count after removing escaped characters: unterminated quotes stay on the lexer path."""
+    if spec.quote_char is None:
+        return True
+    quote = spec.quote_char.encode()
+    if spec.escape_char is not None:
+        escape = spec.escape_char.encode()
+        data = data.replace(escape + escape, b"").replace(escape + quote, b"")
+    return data.count(quote) % 2 == 0
+
+
+def _native_eligible(data: bytes, spec: CsvSpec) -> bool:
+    positions = _positions(spec)
+    contiguous = not spec.header or positions == tuple(range(1, len(positions) + 1))
+    return (
+        _ascii1(spec.delimiter) and _ascii1(spec.quote_char) and _ascii1(spec.escape_char)
+        and spec.comment_char is None and not spec.comment_rows and not spec.skip_initial_space
+        and contiguous and _breaks_safe(data, spec.line_terminator) and _quotes_balanced(data, spec)
+    )
+
+
+def _dangling_escape(text: str, spec: CsvSpec) -> bool:
+    """An odd run of escape characters at the very end of the input (the lexer's rule)."""
+    if spec.escape_char is None or not text.endswith(spec.escape_char):
+        return False
+    return (len(text) - len(text.rstrip(spec.escape_char))) % 2 == 1
+
+
+def _header(text: str, spec: CsvSpec) -> tuple[tuple[str, ...], int]:
+    """Labels from files' header plan and the text offset where data records begin."""
+    if not spec.header:
+        for record, _ in iter_logical_records(text, spec):
+            if record != "":
+                width = len(tokenize_record(record, spec))
+                return tuple(f"field{i}" for i in range(1, width + 1)), 0
+        return (), 0
+    needed = max(_positions(spec))
+    rows, end = [], 0
+    for record, offset in iter_logical_records(text, spec):
+        end = offset
+        if record != "":
+            rows.append(tokenize_record(record, spec))
+        if len(rows) == needed:
+            break
+    labels, _ = apply_header_plan(tuple(rows), True, spec.header_rows, spec.header_join)
+    return labels, end
+
+
+def _plain_csv(labels, rows) -> bytes:
+    """Canonical CSV: text always quoted, nulls empty and unquoted."""
+    def cell(value):
+        return "" if value is None else '"' + value.replace('"', '""') + '"'
+    lines = [",".join(cell(v) for v in labels)] + [",".join(cell(v) for v in row) for row in rows]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def _empty(spec, labels, column_types=None):
+    """Zero-row table for header-only input: null columns unless dtypes say otherwise."""
+    types = {name: _resolve_type(dtype) for name, dtype in (spec.dtypes or ())}
+    types.update(column_types or {})
+    names = [name for name in labels if not spec.columns or name in spec.columns]
+    return pa.table({name: pa.array([], types.get(name, pa.null())) for name in names})
+
+
+def _read(buffer, spec, labels, plain, column_types=None):
+    if not labels or len(buffer) == (0 if not plain else len(_plain_csv(labels, ()))):
+        return _empty(spec, labels, column_types)
+    parse_opts = pacsv.ParseOptions(
+        delimiter="," if plain else spec.delimiter,
+        quote_char='"' if plain else (spec.quote_char or False),
+        double_quote=True if plain else spec.double_quote,
+        escape_char=False if plain else (spec.escape_char or False),
+        newlines_in_values=True,
+        ignore_empty_lines=not plain,   # canonical rows are never blank; a one-column null row is an empty line
+    )
+    if spec.null_sequence is not None and not plain:
+        null_values, quoted_null = [spec.null_sequence], True
+    else:
+        null_values, quoted_null = [""], False
+    types = {name: _resolve_type(dtype) for name, dtype in (spec.dtypes or ())}
+    types.update(column_types or {})
+    convert = pacsv.ConvertOptions(
+        null_values=null_values, strings_can_be_null=True, quoted_strings_can_be_null=quoted_null,
+        include_columns=list(spec.columns) if spec.columns else None, column_types=types,
+    )
+    read = pacsv.ReadOptions(use_threads=True, encoding="utf8",
+                             column_names=list(labels), skip_rows=1 if plain else 0)
+    return pacsv.read_csv(pa.BufferReader(buffer), read_options=read, parse_options=parse_opts,
+                          convert_options=convert)
 
 
 def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
-    if isinstance(data, bytes):
-        raw = data
-    else:
-        raw = data.read()
+    try:
+        _validate_delimited_spec(spec)
+    except ValueError as exc:
+        raise ParseError(spec.FORMAT, str(exc)) from exc
+    raw = data if isinstance(data, bytes) else data.read()
     if not raw:
-        raise ParseError("csv", "Empty input")
+        raise ParseError(spec.FORMAT, "Empty input")
     try:
         text = raw.decode(spec.encoding)
     except UnicodeDecodeError as exc:
-        raise ParseError("csv", str(exc)) from exc
-    records = remove_comment_records(scan_logical_records(text, spec), spec)
-    rows = tuple(tokenize_record(record, spec) for record in records if record != "")
-    labels, values = apply_header_plan(
-        rows, spec.header, spec.header_rows, spec.header_join
-    )
-    arrays = {
-        label: _infer_values([row[index] for row in values])
-        for index, label in enumerate(labels)
-    }
+        raise ParseError(spec.FORMAT, str(exc)) from exc
+    if _dangling_escape(text, spec):
+        raise ParseError(spec.FORMAT, "dangling escape")
+    selection = spec
+    if spec.columns == ():
+        selection = dataclasses.replace(spec, columns=None)   # validate fully, then select nothing
     try:
-        table = pa.table(arrays)
-    except Exception as exc:
-        raise ParseError("csv", str(exc)) from exc
-    if spec.dtypes is not None:
-        table = table.cast(
-            pa.schema(
-                [pa.field(name, _resolve_type(dtype)) for name, dtype in spec.dtypes]
+        if _native_eligible(raw, selection):
+            labels, start = _header(text, selection)
+            buffer, plain = native_buffer(text[start:].encode("utf-8")), False
+        else:
+            records = remove_comment_records(tuple(r for r, _ in iter_logical_records(text, selection)), selection)
+            rows = tuple(
+                tuple(None if ((selection.null_sequence is not None and value == selection.null_sequence)
+                               or (selection.null_sequence is None and value == "" and not quoted))
+                      else value for value, quoted in tokenize_record_quoted(r, selection))
+                for r in records if r != ""
             )
-        )
-    if spec.columns is not None:
-        table = table.select(list(spec.columns))
-    return table
-
-
-_INTEGER = re.compile(r"[+-]?\d+\Z")
-_FLOAT = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][+-]?\d+)?\Z")
-
-
-def _infer_values(values: list[str | None]) -> Sequence[str | int | float | None]:
-    non_null = [value for value in values if value is not None]
-    if non_null and all(_INTEGER.fullmatch(value) for value in non_null):
-        return [None if value is None else int(value) for value in values]
-    if non_null and all(_FLOAT.fullmatch(value) for value in non_null):
-        return [None if value is None else float(value) for value in values]
-    return values
+            labels, values = apply_header_plan(rows, selection.header, selection.header_rows, selection.header_join)
+            buffer, plain = native_buffer(_plain_csv(labels, values)), True
+        if len(labels) != len(set(labels)):
+            raise ParseError(spec.FORMAT, "duplicate final header labels")
+        table = _read(buffer, selection, labels, plain)
+        if selection.temporal == "text":
+            temporal = {f.name: pa.string() for f in table.schema if pa.types.is_temporal(f.type)}
+            if temporal:
+                table = _read(buffer, selection, labels, plain, temporal)
+    except ParseError:
+        raise
+    except Exception as exc:
+        raise ParseError(spec.FORMAT, str(exc)) from exc
+    return table.select([]) if spec.columns == () else table
 
 
 def _resolve_type(dtype_str: str) -> pa.DataType:

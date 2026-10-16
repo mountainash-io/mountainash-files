@@ -36,6 +36,8 @@ _LOCK = threading.RLock()
 _SPECS: dict[str, type[FormatSpec] | str] = {}
 _PARSERS: dict[str, t.Callable | str] = {}
 _SERIALISERS: dict[str, t.Callable | str | None] = {}
+_ACCESS: dict[str, t.Any] = {}
+_ACCESS_VALUES = ("bytes", "random")
 _SUFFIX_MAP: dict[str, str] = {}
 _MEDIATYPE_MAP: dict[str, str] = {}
 _SUFFIX_OVERRIDES: dict[str, dict[str, t.Any]] = {}
@@ -54,6 +56,7 @@ def _reset_registry() -> None:
         _SPECS.clear()
         _PARSERS.clear()
         _SERIALISERS.clear()
+        _ACCESS.clear()
         _SUFFIX_MAP.clear()
         _MEDIATYPE_MAP.clear()
         _SUFFIX_OVERRIDES.clear()
@@ -67,6 +70,7 @@ def _register_builtin_formats() -> None:
     from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
     from mountainash_files.formats.parquet import (
         ParquetSpec,
+        parquet_access,
         parquet_parse,
         parquet_serialise,
     )
@@ -86,6 +90,7 @@ def _register_builtin_formats() -> None:
         ParquetSpec,
         parquet_parse,
         serialiser=parquet_serialise,
+        access=parquet_access,
         override=True,
     )
     register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
@@ -116,6 +121,7 @@ def register_format(
     serialiser: t.Callable | str | None = None,
     suffix_overrides: dict[str, dict[str, t.Any]] | None = None,
     override: bool = False,
+    access: t.Any = "bytes",
 ) -> None:
     if isinstance(spec_cls, str):
         _validate_dotted(spec_cls, "spec_cls")
@@ -135,7 +141,10 @@ def register_format(
         _validate_dotted(parser, "parser")
     if isinstance(serialiser, str):
         _validate_dotted(serialiser, "serialiser")
-
+    if isinstance(access, str) and access not in _ACCESS_VALUES:
+        raise ValueError(f"access must be one of {_ACCESS_VALUES} or a callable, got {access!r}")
+    if not isinstance(access, str) and not callable(access):
+        raise ValueError("access must be 'bytes', 'random' or a callable of the spec")
     if key != key.lower():
         raise ValueError(f"Format keys must be lowercase, got {key!r}")
 
@@ -178,6 +187,7 @@ def register_format(
         _SPECS[key] = spec_cls
         _PARSERS[key] = parser
         _SERIALISERS[key] = serialiser
+        _ACCESS[key] = access
         for suffix in sfx:
             _SUFFIX_MAP[suffix] = key
         for mediatype in mts:
@@ -251,6 +261,19 @@ def _resolve(ref: str, format_key: str, field: str) -> t.Any:
         raise FormatResolutionError(
             format_key=format_key, ref=ref, field=field
         ) from exc
+
+
+def get_access(format_key: str, spec: t.Any) -> str:
+    """The registered acquisition mode for *spec*: 'bytes' or 'random'."""
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _SPECS:
+            _raise_unknown(path=None)
+        mode = _ACCESS.get(key, "bytes")
+    value = mode(spec) if callable(mode) else mode
+    if value not in _ACCESS_VALUES:
+        raise ValueError(f"access for {key!r} returned {value!r}; expected one of {_ACCESS_VALUES}")
+    return value
 
 
 def get_parser(format_key: str) -> t.Callable:

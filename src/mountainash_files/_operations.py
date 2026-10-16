@@ -9,10 +9,18 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-from mountainash_transport import PathNotFoundError, Pipeline, StorageFacade
+from mountainash_transport import (
+    PathNotFoundError,
+    Pipeline,
+    RangeNotSupportedError,
+    StorageFacade,
+    UnsupportedOperationError,
+    infer_pipeline,
+)
 
 from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
 from mountainash_files.formats._registry import (
+    get_access,
     get_parser,
     get_serialiser,
     get_spec_class,
@@ -29,7 +37,7 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
     from mountainash_auth_client import AuthProfile
-    from mountainash_transport import GPG, Gzip, StorageProfileProtocol
+    from mountainash_transport import GPG, Gzip, RangePolicy, StorageProfileProtocol
 
 _VALID_OUTPUTS = ("arrow", "pydata")
 _logger = logging.getLogger(__name__)
@@ -269,20 +277,51 @@ def parse(
         overrides = get_suffix_overrides(matched_suffix)
         spec = get_spec_class(format_key)(**overrides)
 
+    parser = get_parser(format_key)
     try:
-        data = _read_bytes(
-            path, storage_profile, auth_profile, source.transforms,
-            infer=source.infer, gpg=source.gpg, gzip=source.gzip,
+        parsed = _parse_with_access(
+            parser, spec, format_key, path, storage_profile, auth_profile, source
         )
     except (FileNotFoundError, Exception) as exc:
         if source.on_missing == "skip" and _is_not_found(exc):
             return []
         raise
-
-    parser = get_parser(format_key)
-    result_data = _normalise_output(parser(data, spec), output, spec)
+    result_data = _normalise_output(parsed, output, spec)
 
     return [ParseResult(data=result_data, format_key=format_key, spec=spec)]
+
+
+def _no_transforms(path: str, source: FileSourceSpec) -> bool:
+    """Whether the effective pipeline is empty, using transport's public inference."""
+    if source.transforms is not None:
+        return source.transforms.is_empty()
+    if not _read_infer(source.transforms, source.infer):
+        return True
+    pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
+    return pipeline is None or pipeline.is_empty()
+
+
+def _parse_with_access(parser, spec, format_key, path, storage_profile, auth_profile, source):
+    """Ranged handle when the format asks for it and no transforms apply; otherwise whole-object bytes."""
+    if get_access(format_key, spec) == "random" and _no_transforms(path, source):
+        facade = _make_facade(path, storage_profile, auth_profile)
+        try:
+            handle = facade.read_stream(
+                path, pipeline=source.transforms,
+                infer=_read_infer(source.transforms, source.infer),
+                gpg=source.gpg, gzip=source.gzip,
+                access="random", range_policy=None,
+            )
+        except (RangeNotSupportedError, UnsupportedOperationError):
+            handle = None
+        if handle is not None:
+            with handle:
+                return parser(handle, spec)
+    data = _read_bytes(
+        path, storage_profile, auth_profile, source.transforms,
+        infer=source.infer, gpg=source.gpg, gzip=source.gzip,
+    )
+    return parser(data, spec)
 
 
 def _append_table(data: Any) -> pa.Table:
@@ -464,12 +503,16 @@ def stream(
     source: FileSourceSpec,
     *,
     params: dict[str, Any] | None = None,
+    access: t.Literal["sequential", "random", "buffered"] = "sequential",
+    range_policy: "RangePolicy | None" = None,
 ) -> Iterator[BinaryIO]:
     """Return a raw byte stream from a source as a context manager.
 
     Applies transforms (decompress/decrypt) but no format parsing. Delegates
     consumption and seekability to transport; decoding can fail during reads.
-    The returned stream is closed when the context exits.
+    ``access`` and ``range_policy`` pass to transport unchanged and there is no
+    fallback: transport errors propagate. The returned stream is closed when the
+    context exits.
     """
     path = source.path
     if params:
@@ -483,6 +526,7 @@ def stream(
             path, pipeline=source.transforms,
             infer=_read_infer(source.transforms, source.infer),
             gpg=source.gpg, gzip=source.gzip,
+            access=access, range_policy=range_policy,
         )
     except Exception as exc:
         if source.on_missing != "skip" or not _is_not_found(exc):
