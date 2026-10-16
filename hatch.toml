@@ -121,6 +121,8 @@ dependencies = [
     "lxml-stubs==0.5.1",
     "types-openpyxl==3.1.5.20260827",
     "types-PyYAML==6.0.12.20260906",
+    # Ships py.typed; the xlsx extra is not installed into this env otherwise.
+    "fastexcel>=0.21,<0.22",
 ]
 [envs.mypy.scripts]
 check = "mypy {args:src/mountainash_files tests}"

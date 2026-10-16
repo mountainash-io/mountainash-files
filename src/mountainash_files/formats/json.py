@@ -41,7 +41,7 @@ def _finish(table: pa.Table, spec: JsonSpec) -> pa.Table:
 
 
 def _with_keys(table: pa.Table, keys: tuple[str, ...]) -> pa.Table:
-    columns = [table[k] if k in table.column_names else pa.nulls(table.num_rows) for k in keys]
+    columns = [table.column(k) if k in table.column_names else pa.chunked_array([pa.nulls(table.num_rows)]) for k in keys]
     return pa.Table.from_arrays(columns, names=list(keys))
 
 

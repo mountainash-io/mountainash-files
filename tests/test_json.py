@@ -60,7 +60,9 @@ def test_mixed_shape_and_width_drift_fail() -> None:
     ],
 )
 def test_mixed_column_types_widen_to_string(payload: bytes, spec: JsonSpec) -> None:
-    assert json_parse(payload, spec).column("x").to_pylist() == ["1", "bad"]
+    table = json_parse(payload, spec)
+    assert isinstance(table, pa.Table)
+    assert table.column("x").to_pylist() == ["1", "bad"]
 
 
 def test_json_input_io_failure_is_not_reclassified() -> None:

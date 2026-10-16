@@ -54,7 +54,7 @@ def _project(table: pa.Table, columns: list[str], schema: pa.Schema) -> pa.Table
             array = pc.struct_field(array, part)
         arrays.append(array)
         fields.append(_leaf_field(schema, parts))
-    return pa.Table.from_arrays(arrays, schema=pa.schema(fields, metadata=schema.metadata))
+    return pa.Table.from_arrays(arrays, schema=pa.schema(fields).with_metadata(schema.metadata or {}))
 
 
 def parquet_parse(data: bytes | BinaryIO, spec: ParquetSpec) -> pa.Table:

@@ -141,5 +141,6 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
             continue
         parts = [b.column(j) if j < b.num_columns else pa.chunked_array([pa.nulls(b.num_rows)]) for b in blocks]
         target = _merge_type([p.type for p in parts])
-        columns.append(pa.chunked_array([c for p in parts for c in _as(p, target).chunks], type=target))
+        chunks = [c for p in parts for c in _as(p, target).chunks]
+        columns.append(pa.chunked_array(chunks, type=target))  # type: ignore[call-overload]  # stubs lack a DataType overload
     return _recover_ints(pa.Table.from_arrays(columns, names=labels))
