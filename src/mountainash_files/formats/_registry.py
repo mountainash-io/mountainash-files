@@ -94,12 +94,7 @@ def _register_builtin_formats() -> None:
         override=True,
     )
     register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
-    register_format(
-        XlsxSpec,
-        xlsx_parse,
-        suffix_overrides={".xlsb": {"engine": "fastexcel"}},
-        override=True,
-    )
+    register_format(XlsxSpec, xlsx_parse, override=True)
     register_format(XmlSpec, xml_parse, serialiser=xml_serialise, override=True)
 
 

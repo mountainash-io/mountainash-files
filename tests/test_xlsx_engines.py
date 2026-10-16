@@ -19,27 +19,29 @@ def book(rows):
     return buf.getvalue()
 
 
+# Expected values are the previous openpyxl reader's output for each layout.
 LAYOUTS = {
-    "plain": ([["a", "b"], [1, 1.5], [2, 2.5]], {}),
-    "no header": ([[1, 1.5], [2, 2.5]], {"header": False}),
+    "plain": ([["a", "b"], [1, 1.5], [2, 2.5]], {}, ["a", "b"]),
+    "no header": ([[1, 1.5], [2, 2.5]], {"header": False}, ["field1", "field2"]),
     "comments lead+mid, two header rows": ([["# note"], ["a", "b"], ["x", "y"], [1, 1.5], ["# mid"], [2, 2.5]],
-                                           {"comment_char": "#", "header_rows": (1, 2)}),
-    "comment_rows": ([["junk"], ["a", "b"], [1, 1.5], [2, 2.5]], {"comment_rows": (1,)}),
-    "non-contiguous header": ([["a", "b"], [1, 1.5], ["x", "y"], [2, 2.5]], {"header_rows": (1, 3), "header_join": "."}),
-    "header only": ([["a", "b"]], {}),
+                                           {"comment_char": "#", "header_rows": (1, 2)}, ["a x", "b y"]),
+    "comment_rows": ([["junk"], ["a", "b"], [1, 1.5], [2, 2.5]], {"comment_rows": (1,)}, ["a", "b"]),
+    "non-contiguous header": ([["a", "b"], [1, 1.5], ["x", "y"], [2, 2.5]], {"header_rows": (1, 3), "header_join": "."},
+                              ["a.x", "b.y"]),
+    "header only": ([["a", "b"]], {}, ["a", "b"]),
 }
 
 
 @pytest.mark.parametrize("name", LAYOUTS)
-def test_layouts_match_openpyxl_engine(name, tmp_path):
-    rows, kw = LAYOUTS[name]
+def test_layouts(name, tmp_path):
+    rows, kw, names = LAYOUTS[name]
     raw = book(rows)
     path = tmp_path / "b.xlsx"
     path.write_bytes(raw)
-    old = xlsx_parse(raw, XlsxSpec(engine="openpyxl", **kw))
-    for new in (xlsx_parse(raw, XlsxSpec(**kw)), parse(FileSourceSpec(path=str(path), format=XlsxSpec(**kw)))[0].data):
-        assert new.column_names == old.column_names
-        assert new.to_pylist() == old.to_pylist()
+    records = [] if name == "header only" else [dict(zip(names, (1, 1.5))), dict(zip(names, (2, 2.5)))]
+    for got in (xlsx_parse(raw, XlsxSpec(**kw)), parse(FileSourceSpec(path=str(path), format=XlsxSpec(**kw)))[0].data):
+        assert got.column_names == names
+        assert got.to_pylist() == records
 
 
 def test_blank_and_duplicate_header_labels():
@@ -69,10 +71,9 @@ def test_whole_numbers_become_int64_and_iso_dates_infer():
     assert xlsx_parse(book([["d"], ["2020-01-01"]]), XlsxSpec(temporal="text")).schema.field("d").type == pa.string()
 
 
-def test_empty_sheet_and_engine_fastexcel():
+def test_empty_sheet():
     assert xlsx_parse(book([]), XlsxSpec()).num_rows == 0
     assert xlsx_parse(book([]), XlsxSpec(comment_char="#")).num_rows == 0
-    assert xlsx_parse(book([["a"], [1]]), XlsxSpec(engine="fastexcel")).to_pylist() == [{"a": 1}]
 
 
 def test_errors_are_parse_errors():
@@ -100,15 +101,16 @@ def test_whole_sheet_inference_and_validated_sampling():
     ([[None, None], [1, 2]], {"header": False}, [{"field1": None, "field2": None}, {"field1": 1, "field2": 2}]),
 ])
 def test_leading_blank_rows_do_not_lose_data(rows, kw, expected):
-    raw = book(rows)
-    assert xlsx_parse(raw, XlsxSpec(**kw)).to_pylist() == expected == xlsx_parse(raw, XlsxSpec(engine="openpyxl", **kw)).to_pylist()
+    assert xlsx_parse(book(rows), XlsxSpec(**kw)).to_pylist() == expected
 
 
-def test_leading_blank_rows_count_as_rows_for_header_and_comment_positions():
-    rows = [[None], ["# c"], ["a"], ["b"]]
-    for kw in ({"comment_char": "#"}, {"comment_rows": (2,)}, {"header_rows": (3,)}):
-        raw = book(rows)
-        assert xlsx_parse(raw, XlsxSpec(**kw)).to_pylist() == xlsx_parse(raw, XlsxSpec(engine="openpyxl", **kw)).to_pylist()
+@pytest.mark.parametrize("kw,expected", [
+    ({"comment_char": "#"}, [{"field1": "a"}, {"field1": "b"}]),
+    ({"comment_rows": (2,)}, [{"field1": "a"}, {"field1": "b"}]),
+    ({"header_rows": (3,)}, [{"a": None}, {"a": "# c"}, {"a": "b"}]),
+])
+def test_leading_blank_rows_count_as_rows_for_header_and_comment_positions(kw, expected):
+    assert xlsx_parse(book([[None], ["# c"], ["a"], ["b"]]), XlsxSpec(**kw)).to_pylist() == expected
 
 
 @pytest.mark.parametrize("rows", [[["", " "]], [[None, None]], [[""]]])
