@@ -171,3 +171,43 @@ def test_failing_later_member_raises_instead_of_partial_results(tmp_path):
     path.write_bytes(_zip({"a.parquet": _parquet(5), "b.parquet": b"broken"}))
     with pytest.raises(ParseError):
         inspect_schema(FileSourceSpec(path=str(path), archive=ZipArchive()))
+
+
+# --- CSV over sources ----------------------------------------------------------------------------
+
+def _csv(rows: int, late: str = "text") -> bytes:
+    body = "".join(f"{i},{i * 1.5}\n" for i in range(rows))
+    return ("id,amount\n" + body + f"{late},0.5\n").encode()
+
+
+def test_bounded_csv_over_http_reads_a_prefix_without_ranges():
+    raw = _csv(400_000)   # about 7 MB
+    with serve({"a.csv": raw}) as (base, log):
+        (result,) = inspect_schema(FileSourceSpec(path=f"{base}/a.csv"), infer_schema_rows=100)
+        deadline = time.monotonic() + 5
+        while not log and time.monotonic() < deadline:
+            time.sleep(0.01)
+    assert result.basis == "bounded" and result.schema.field("id").type == pa.int64()
+    assert ranged_gets(log) == 0 and bytes_sent(log) < len(raw) // 2
+
+
+def test_full_csv_over_http_matches_parse():
+    from mountainash_files import parse
+
+    raw = _csv(1_000)
+    with serve({"a.csv": raw}) as (base, _):
+        (result,) = inspect_schema(FileSourceSpec(path=f"{base}/a.csv"))
+        (parsed,) = parse(FileSourceSpec(path=f"{base}/a.csv"))
+    assert result.basis == "full" and result.schema == parsed.data.schema
+    assert result.schema.field("id").type == pa.string()
+
+
+def test_zip_csv_budget_applies_per_member(tmp_path):
+    path = tmp_path / "a.zip"
+    path.write_bytes(_zip({"one.csv": _csv(5), "two.csv": _csv(5)}))
+    source = FileSourceSpec(path=str(path), archive=ZipArchive())
+    bounded = inspect_schema(source, infer_schema_rows=1)
+    full = inspect_schema(source)
+    assert [r.schema.field("id").type for r in bounded] == [pa.int64(), pa.int64()]
+    assert [r.basis for r in bounded] == ["bounded", "bounded"]
+    assert [r.schema.field("id").type for r in full] == [pa.string(), pa.string()]

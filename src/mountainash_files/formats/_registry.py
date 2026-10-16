@@ -72,7 +72,13 @@ def _reset_registry() -> None:
 
 
 def _register_builtin_formats() -> None:
-    from mountainash_files.formats.csv import CsvSpec, csv_parse, csv_serialise
+    from mountainash_files.formats.csv import (
+        CsvSpec,
+        csv_inspect_schema,
+        csv_parse,
+        csv_schema_access,
+        csv_serialise,
+    )
     from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
     from mountainash_files.formats.parquet import (
         ParquetSpec,
@@ -85,7 +91,10 @@ def _register_builtin_formats() -> None:
     from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
     from mountainash_files.formats.xml import XmlSpec, xml_parse, xml_serialise
 
-    register_format(CsvSpec, csv_parse, serialiser=csv_serialise, override=True)
+    register_format(
+        CsvSpec, csv_parse, serialiser=csv_serialise,
+        schema_inspector=csv_inspect_schema, schema_access=csv_schema_access, override=True,
+    )
     register_format(
         JsonSpec,
         json_parse,
@@ -102,7 +111,10 @@ def _register_builtin_formats() -> None:
         schema_access="random",
         override=True,
     )
-    register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
+    register_format(
+        TsvSpec, csv_parse, serialiser=csv_serialise,
+        schema_inspector=csv_inspect_schema, schema_access=csv_schema_access, override=True,
+    )
     register_format(XlsxSpec, xlsx_parse, override=True)
     register_format(XmlSpec, xml_parse, serialiser=xml_serialise, override=True)
 

@@ -9,13 +9,16 @@ import pytest
 
 from mountainash_files import (
     FormatResolutionError,
+    ParseError,
     SchemaDiscoveryUnsupportedError,
     SchemaResult,
     inspect_schema_bytes,
     parse_bytes,
 )
 from mountainash_files.formats._registry import _reset_registry, register_format
+from mountainash_files.formats.csv import CsvSpec
 from mountainash_files.formats.parquet import ParquetSpec
+from mountainash_files.formats.tsv import TsvSpec
 
 import _schema_plugin
 from _schema_plugin import TypedSpec, typed_inspect, typed_parse
@@ -155,3 +158,96 @@ def test_schema_access_is_validated():
         register_format(TypedSpec, typed_parse, schema_inspector=typed_inspect, schema_access="bogus")
     with pytest.raises(ValueError):
         register_format(TypedSpec, typed_parse, schema_inspector=typed_inspect, schema_access=3)
+
+
+# --- CSV / TSV -----------------------------------------------------------------------------------
+
+CSV_WIRE = b'# c\nvalue,note\n1,"two\nlines"\n2,next\nlate,tail\n'
+
+
+def test_csv_bounded_is_an_observation_and_full_matches_parse():
+    spec = CsvSpec(comment_char="#")
+    bounded = inspect_schema_bytes(CSV_WIRE, spec, infer_schema_rows=1)
+    full = inspect_schema_bytes(CSV_WIRE, spec)
+    assert bounded.schema == pa.schema([("value", pa.int64()), ("note", pa.string())])
+    assert bounded.basis == "bounded"
+    assert full.schema == parse_bytes(CSV_WIRE, spec).data.schema and full.basis == "full"
+    assert full.schema.field("value").type == pa.string()
+
+
+def test_csv_multi_row_header_is_not_charged():
+    wire = b"id,amount\nunit,usd\n1,2.5\n2,3.5\n"
+    result = inspect_schema_bytes(wire, CsvSpec(header_rows=(1, 2)), infer_schema_rows=1)
+    assert result.schema == pa.schema([("id unit", pa.int64()), ("amount usd", pa.float64())])
+    assert result.basis == "bounded"
+
+
+def test_csv_comment_rows_count_logical_records():
+    # record 2 spans two physical lines; record 3 is the comment row
+    wire = b'a,b\n1,"x\ny"\nskip,me\n2,z\nlate,w\n'
+    result = inspect_schema_bytes(wire, CsvSpec(comment_rows=(3,)), infer_schema_rows=2)
+    assert result.schema == pa.schema([("a", pa.int64()), ("b", pa.string())])
+    assert result.basis == "bounded"
+
+
+@pytest.mark.parametrize("wire,basis", [
+    (b"a\n1\n2\n", "full"),
+    (b"a\n1\n2", "full"),
+    (b"a\n1\n2\n3\n", "bounded"),
+])
+def test_csv_exact_boundary(wire, basis):
+    assert inspect_schema_bytes(wire, "csv", infer_schema_rows=2).basis == basis
+
+
+class Trickle(io.RawIOBase):
+    """Returns at most `size` bytes per read, so chunk ends land inside quotes and escapes."""
+
+    def __init__(self, data: bytes, size: int):
+        self._data, self._pos, self._size = data, 0, size
+
+    def readable(self):
+        return True
+
+    def read(self, n=-1):
+        chunk = self._data[self._pos:self._pos + self._size]
+        self._pos += len(chunk)
+        return chunk
+
+
+@pytest.mark.parametrize("size", [1, 2, 3, 7, 64])
+@pytest.mark.parametrize("spec,body", [
+    (CsvSpec(), '{i},"a ""q"" b\nc"\n'),
+    (CsvSpec(escape_char="\\", quote_char=None), '{i},a\\,b\n'),
+])
+def test_csv_bounded_prefix_survives_chunk_boundaries(size, spec, body):
+    rows = "".join(body.format(i=i) for i in range(50))
+    wire = ("id,text\n" + rows + "late,x\n").encode()
+    result = inspect_schema_bytes(Trickle(wire, size), spec, infer_schema_rows=5)
+    assert result.basis == "bounded" and result.schema.field("id").type == pa.int64()
+
+
+def test_csv_malformed_input_still_fails_at_eof():
+    with pytest.raises(ParseError):
+        inspect_schema_bytes(Trickle(b'a\n"unterminated\n', 3), "csv", infer_schema_rows=5)
+
+
+@pytest.mark.parametrize("wire,spec", [
+    (b"a,b\n1,2020-01-01\n", CsvSpec(temporal="text")),
+    (b"a,b\nNA,1\n2,\n", CsvSpec(null_sequence="NA")),
+    (b"a,b\n1,2\n", CsvSpec(dtypes=(("a", "string"),))),
+    (b"a,b,c\n1,2,3\n", CsvSpec(columns=("c", "a"))),
+    ("a,b\n1,\u00e9\n".encode("latin-1"), CsvSpec(encoding="latin-1")),
+    (b"a,b\n1,x\\,y\n", CsvSpec(escape_char="\\", quote_char=None)),
+    (b"a,b\n", CsvSpec()),
+    (b"\n\n", CsvSpec(header=False)),
+    (b"a\tb\n1\t2.5\n", TsvSpec()),
+])
+def test_csv_full_schema_equals_parse(wire, spec):
+    result = inspect_schema_bytes(wire, spec)
+    assert result.schema == parse_bytes(wire, spec).data.schema and result.basis == "full"
+
+
+def test_csv_empty_input_keeps_the_parse_error():
+    with pytest.raises(ParseError) as caught:
+        inspect_schema_bytes(b"", TsvSpec())
+    assert caught.value.format_key == "tsv"
