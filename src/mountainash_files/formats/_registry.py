@@ -70,6 +70,7 @@ def _register_builtin_formats() -> None:
     from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
     from mountainash_files.formats.parquet import (
         ParquetSpec,
+        parquet_access,
         parquet_parse,
         parquet_serialise,
     )
@@ -89,6 +90,7 @@ def _register_builtin_formats() -> None:
         ParquetSpec,
         parquet_parse,
         serialiser=parquet_serialise,
+        access=parquet_access,
         override=True,
     )
     register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
