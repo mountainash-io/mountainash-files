@@ -79,7 +79,13 @@ def _register_builtin_formats() -> None:
         csv_schema_access,
         csv_serialise,
     )
-    from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
+    from mountainash_files.formats.json import (
+        JsonSpec,
+        json_inspect_schema,
+        json_parse,
+        json_schema_access,
+        json_serialise,
+    )
     from mountainash_files.formats.parquet import (
         ParquetSpec,
         parquet_access,
@@ -100,6 +106,8 @@ def _register_builtin_formats() -> None:
         json_parse,
         serialiser=json_serialise,
         suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
+        schema_inspector=json_inspect_schema,
+        schema_access=json_schema_access,
         override=True,
     )
     register_format(

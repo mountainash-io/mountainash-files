@@ -17,6 +17,7 @@ from mountainash_files import (
 )
 from mountainash_files.formats._registry import _reset_registry, register_format
 from mountainash_files.formats.csv import CsvSpec
+from mountainash_files.formats.json import JsonSpec
 from mountainash_files.formats.parquet import ParquetSpec
 from mountainash_files.formats.tsv import TsvSpec
 
@@ -251,3 +252,84 @@ def test_csv_empty_input_keeps_the_parse_error():
     with pytest.raises(ParseError) as caught:
         inspect_schema_bytes(b"", TsvSpec())
     assert caught.value.format_key == "tsv"
+
+
+# --- JSON / NDJSON -------------------------------------------------------------------------------
+
+DRIFT = b'[{"id":1,"nested":{"a":1}},{"id":2,"nested":{"a":2,"later":"x"},"extra":true}]'
+
+
+def test_json_bounded_omits_late_fields_and_full_matches_parse():
+    first = inspect_schema_bytes(DRIFT, "json", infer_schema_rows=1)
+    full = inspect_schema_bytes(DRIFT, "json")
+    assert first.schema.names == ["id", "nested"] and first.basis == "bounded"
+    assert full.schema == parse_bytes(DRIFT, "json").data.schema and full.basis == "full"
+    assert "extra" in full.schema.names
+
+
+@pytest.mark.parametrize("spec", [
+    JsonSpec(ndjson=True, item_type="array", header=True),
+    JsonSpec(ndjson=True, header=True),
+])
+def test_ndjson_array_header_is_not_charged(spec):
+    wire = b'["id","amount"]\n[1,2.5]\n[2,3.5]\n'
+    result = inspect_schema_bytes(wire, spec, infer_schema_rows=1)
+    assert result.schema == pa.schema([("id", pa.int64()), ("amount", pa.float64())])
+    assert result.basis == "bounded"
+
+
+def test_ndjson_blank_lines_are_not_records():
+    wire = b'{"a":1}\n\n\n{"a":2}\n{"a":"late"}\n'
+    result = inspect_schema_bytes(io.BytesIO(wire), JsonSpec(ndjson=True), infer_schema_rows=2)
+    assert result.schema == pa.schema([("a", pa.int64())]) and result.basis == "bounded"
+
+
+@pytest.mark.parametrize("wire,basis", [(b'{"a":1}\n{"a":2}', "full"), (b'{"a":1}\n{"a":2}\n{"a":3}\n', "bounded")])
+def test_ndjson_exact_boundary(wire, basis):
+    assert inspect_schema_bytes(wire, JsonSpec(ndjson=True), infer_schema_rows=2).basis == basis
+
+
+def test_json_property_selection_and_budget():
+    wire = b'{"meta":{"rows":[{"a":1},{"a":"late"}]}}'
+    spec = JsonSpec(property="meta.rows")
+    assert inspect_schema_bytes(wire, spec, infer_schema_rows=1).schema == pa.schema([("a", pa.int64())])
+    assert inspect_schema_bytes(wire, spec).schema == parse_bytes(wire, spec).data.schema
+    with pytest.raises(ParseError):
+        inspect_schema_bytes(wire, JsonSpec(property="meta.missing"), infer_schema_rows=1)
+
+
+def test_spec_sampling_makes_a_full_budget_bounded():
+    assert inspect_schema_bytes(b'[{"a":1},{"a":2}]', JsonSpec(infer_sample_rows=5)).basis == "bounded"
+
+
+def test_scalar_array_is_a_parse_error():
+    with pytest.raises(ParseError) as caught:
+        inspect_schema_bytes(b"[1,2,3]", "json")
+    assert caught.value.format_key == "json"
+
+
+@pytest.mark.parametrize("wire,spec", [
+    (b'{"a":1,"b":"x"}', JsonSpec()),
+    (b"[]", JsonSpec()),
+    (b'[{"a":1},{"b":2}]', JsonSpec(item_keys=("b", "a"))),
+    (b'[["x","y"],[1,2]]', JsonSpec(item_type="array")),
+    (b'[{"d":"2020-01-01"}]', JsonSpec(temporal="text")),
+])
+def test_json_full_schema_equals_parse(wire, spec):
+    result = inspect_schema_bytes(wire, spec)
+    assert result.schema == parse_bytes(wire, spec).data.schema and result.basis == "full"
+
+
+@pytest.mark.parametrize("size", [1, 3, 64])
+def test_ndjson_prefix_from_small_chunks(size):
+    wire = b"".join(b'{"a":%d,"s":"x\\ny"}\n' % i for i in range(20)) + b'{"a":"late"}\n'
+    result = inspect_schema_bytes(Trickle(wire, size), JsonSpec(ndjson=True), infer_schema_rows=5)
+    assert result.schema == pa.schema([("a", pa.int64()), ("s", pa.string())]) and result.basis == "bounded"
+
+
+def test_utf16_ndjson_stream_matches_bytes():
+    wire = '{"a":1}\n{"a":2}\n{"a":"late"}\n'.encode("utf-16-le")
+    spec = JsonSpec(ndjson=True)
+    from_stream = inspect_schema_bytes(Trickle(wire, 5), spec, infer_schema_rows=2)
+    assert from_stream.schema == inspect_schema_bytes(wire, spec, infer_schema_rows=2).schema
+    assert from_stream.schema == pa.schema([("a", pa.int64())])

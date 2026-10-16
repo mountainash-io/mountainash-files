@@ -211,3 +211,15 @@ def test_zip_csv_budget_applies_per_member(tmp_path):
     assert [r.schema.field("id").type for r in bounded] == [pa.int64(), pa.int64()]
     assert [r.basis for r in bounded] == ["bounded", "bounded"]
     assert [r.schema.field("id").type for r in full] == [pa.string(), pa.string()]
+
+
+def test_bounded_jsonl_over_http_reads_a_prefix():
+    raw = b"".join(b'{"id":%d,"v":%d.5}\n' % (i, i) for i in range(300_000)) + b'{"id":"late"}\n'
+    with serve({"a.jsonl": raw}) as (base, log):
+        (result,) = inspect_schema(FileSourceSpec(path=f"{base}/a.jsonl"), infer_schema_rows=100)
+        deadline = time.monotonic() + 5
+        while not log and time.monotonic() < deadline:
+            time.sleep(0.01)
+    assert result.spec.ndjson and result.basis == "bounded"
+    assert result.schema == pa.schema([("id", pa.int64()), ("v", pa.float64())])
+    assert ranged_gets(log) == 0 and bytes_sent(log) < len(raw) // 2
