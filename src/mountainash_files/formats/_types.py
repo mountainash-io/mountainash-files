@@ -4,8 +4,10 @@ import dataclasses
 import json as _json
 import types
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
+    Literal,
     Self,
     Union,
     cast,
@@ -13,6 +15,9 @@ from typing import (
     get_origin,
     get_type_hints,
 )
+
+if TYPE_CHECKING:
+    import pyarrow as pa
 
 
 class FormatSpec:
@@ -118,6 +123,17 @@ class ParseResult:
     """Typed wrapper around parsed data."""
 
     data: Any
+    format_key: str
+    spec: FormatSpec
+    skipped_members: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class SchemaResult:
+    """An observed Arrow schema and how it was obtained: evidence, not a parse contract."""
+
+    schema: pa.Schema
+    basis: Literal["metadata", "full", "bounded"]
     format_key: str
     spec: FormatSpec
     skipped_members: tuple[str, ...] = ()

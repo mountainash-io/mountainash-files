@@ -10,6 +10,7 @@ from pathlib import PurePosixPath
 from mountainash_files.formats._exceptions import (
     FormatConflictError,
     FormatResolutionError,
+    SchemaDiscoveryUnsupportedError,
     UnknownFormatError,
 )
 from mountainash_files.formats._types import FormatSpec
@@ -38,6 +39,9 @@ _PARSERS: dict[str, t.Callable | str] = {}
 _SERIALISERS: dict[str, t.Callable | str | None] = {}
 _ACCESS: dict[str, t.Any] = {}
 _ACCESS_VALUES = ("bytes", "random")
+_INSPECTORS: dict[str, t.Callable | str | None] = {}
+_SCHEMA_ACCESS: dict[str, t.Any] = {}
+_SCHEMA_ACCESS_VALUES = ("bytes", "random", "sequential")
 _SUFFIX_MAP: dict[str, str] = {}
 _MEDIATYPE_MAP: dict[str, str] = {}
 _SUFFIX_OVERRIDES: dict[str, dict[str, t.Any]] = {}
@@ -57,6 +61,8 @@ def _reset_registry() -> None:
         _PARSERS.clear()
         _SERIALISERS.clear()
         _ACCESS.clear()
+        _INSPECTORS.clear()
+        _SCHEMA_ACCESS.clear()
         _SUFFIX_MAP.clear()
         _MEDIATYPE_MAP.clear()
         _SUFFIX_OVERRIDES.clear()
@@ -66,24 +72,42 @@ def _reset_registry() -> None:
 
 
 def _register_builtin_formats() -> None:
-    from mountainash_files.formats.csv import CsvSpec, csv_parse, csv_serialise
-    from mountainash_files.formats.json import JsonSpec, json_parse, json_serialise
+    from mountainash_files.formats.csv import (
+        CsvSpec,
+        csv_inspect_schema,
+        csv_parse,
+        csv_schema_access,
+        csv_serialise,
+    )
+    from mountainash_files.formats.json import (
+        JsonSpec,
+        json_inspect_schema,
+        json_parse,
+        json_schema_access,
+        json_serialise,
+    )
     from mountainash_files.formats.parquet import (
         ParquetSpec,
         parquet_access,
+        parquet_inspect_schema,
         parquet_parse,
         parquet_serialise,
     )
     from mountainash_files.formats.tsv import TsvSpec
-    from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
+    from mountainash_files.formats.xlsx import XlsxSpec, xlsx_inspect_schema, xlsx_parse
     from mountainash_files.formats.xml import XmlSpec, xml_parse, xml_serialise
 
-    register_format(CsvSpec, csv_parse, serialiser=csv_serialise, override=True)
+    register_format(
+        CsvSpec, csv_parse, serialiser=csv_serialise,
+        schema_inspector=csv_inspect_schema, schema_access=csv_schema_access, override=True,
+    )
     register_format(
         JsonSpec,
         json_parse,
         serialiser=json_serialise,
         suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
+        schema_inspector=json_inspect_schema,
+        schema_access=json_schema_access,
         override=True,
     )
     register_format(
@@ -91,10 +115,15 @@ def _register_builtin_formats() -> None:
         parquet_parse,
         serialiser=parquet_serialise,
         access=parquet_access,
+        schema_inspector=parquet_inspect_schema,
+        schema_access="random",
         override=True,
     )
-    register_format(TsvSpec, csv_parse, serialiser=csv_serialise, override=True)
-    register_format(XlsxSpec, xlsx_parse, override=True)
+    register_format(
+        TsvSpec, csv_parse, serialiser=csv_serialise,
+        schema_inspector=csv_inspect_schema, schema_access=csv_schema_access, override=True,
+    )
+    register_format(XlsxSpec, xlsx_parse, schema_inspector=xlsx_inspect_schema, override=True)
     register_format(XmlSpec, xml_parse, serialiser=xml_serialise, override=True)
 
 
@@ -117,6 +146,8 @@ def register_format(
     suffix_overrides: dict[str, dict[str, t.Any]] | None = None,
     override: bool = False,
     access: t.Any = "bytes",
+    schema_inspector: t.Callable | str | None = None,
+    schema_access: t.Any = "bytes",
 ) -> None:
     if isinstance(spec_cls, str):
         _validate_dotted(spec_cls, "spec_cls")
@@ -136,6 +167,14 @@ def register_format(
         _validate_dotted(parser, "parser")
     if isinstance(serialiser, str):
         _validate_dotted(serialiser, "serialiser")
+    if isinstance(schema_inspector, str):
+        _validate_dotted(schema_inspector, "schema_inspector")
+    elif schema_inspector is not None and not callable(schema_inspector):
+        raise ValueError("schema_inspector must be a callable, a 'package.module:attr' reference or None")
+    if isinstance(schema_access, str) and schema_access not in _SCHEMA_ACCESS_VALUES:
+        raise ValueError(f"schema_access must be one of {_SCHEMA_ACCESS_VALUES} or a callable, got {schema_access!r}")
+    if not isinstance(schema_access, str) and not callable(schema_access):
+        raise ValueError("schema_access must be 'bytes', 'random', 'sequential' or a callable")
     if isinstance(access, str) and access not in _ACCESS_VALUES:
         raise ValueError(f"access must be one of {_ACCESS_VALUES} or a callable, got {access!r}")
     if not isinstance(access, str) and not callable(access):
@@ -183,6 +222,8 @@ def register_format(
         _PARSERS[key] = parser
         _SERIALISERS[key] = serialiser
         _ACCESS[key] = access
+        _INSPECTORS[key] = schema_inspector
+        _SCHEMA_ACCESS[key] = schema_access
         for suffix in sfx:
             _SUFFIX_MAP[suffix] = key
         for mediatype in mts:
@@ -268,6 +309,35 @@ def get_access(format_key: str, spec: t.Any) -> str:
     value = mode(spec) if callable(mode) else mode
     if value not in _ACCESS_VALUES:
         raise ValueError(f"access for {key!r} returned {value!r}; expected one of {_ACCESS_VALUES}")
+    return value
+
+
+def get_schema_inspector(format_key: str) -> t.Callable:
+    """The format's schema inspector; raises SchemaDiscoveryUnsupportedError if it has none."""
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _SPECS:
+            _raise_unknown(path=None)
+        ref = _INSPECTORS.get(key)
+        if ref is None:
+            raise SchemaDiscoveryUnsupportedError(key, "the format has no schema inspector")
+        if isinstance(ref, str):
+            resolved = _resolve(ref, key, "schema_inspector")
+            _INSPECTORS[key] = resolved
+            return resolved
+        return ref
+
+
+def get_schema_access(format_key: str, spec: t.Any, infer_schema_rows: int | None) -> str:
+    """What discovery hands the inspector when no transforms apply: 'bytes', 'random' or 'sequential'."""
+    key = format_key.lower()
+    with _LOCK:
+        if key not in _SPECS:
+            _raise_unknown(path=None)
+        mode = _SCHEMA_ACCESS.get(key, "bytes")
+    value = mode(spec, infer_schema_rows) if callable(mode) else mode
+    if value not in _SCHEMA_ACCESS_VALUES:
+        raise ValueError(f"schema_access for {key!r} returned {value!r}; expected one of {_SCHEMA_ACCESS_VALUES}")
     return value
 
 

@@ -4,7 +4,13 @@ import dataclasses
 from typing import ClassVar
 
 from mountainash_files.formats._registry import register_format
-from mountainash_files.formats.csv import CsvSpec, csv_parse, csv_serialise
+from mountainash_files.formats.csv import (
+    CsvSpec,
+    csv_inspect_schema,
+    csv_parse,
+    csv_schema_access,
+    csv_serialise,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -16,4 +22,7 @@ class TsvSpec(CsvSpec):
     delimiter: str = "\t"
 
 
-register_format(TsvSpec, csv_parse, serialiser=csv_serialise)
+register_format(
+    TsvSpec, csv_parse, serialiser=csv_serialise,
+    schema_inspector=csv_inspect_schema, schema_access=csv_schema_access,
+)

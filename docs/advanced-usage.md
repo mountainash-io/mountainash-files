@@ -12,6 +12,8 @@
 | `serialise_bytes(data, format)` | `bytes` | Serialise without storage access |
 | `copy(source, sink, *, params=None)` | `None` | Copy bytes, applying source and sink transforms |
 | `stream(source, *, params=None, access="sequential", range_policy=None)` | context manager yielding a binary stream | Read transformed bytes without parsing |
+| `inspect_schema(source, *, params=None, infer_schema_rows=None)` | `list[SchemaResult]` | Observe each selected input's Arrow schema without returning rows |
+| `inspect_schema_bytes(data, format, *, infer_schema_rows=None)` | `SchemaResult` | Observe the schema of bytes or a binary file-like object |
 
 `ParseResult` contains `data`, `format_key`, `spec` and `skipped_members`.
 Tabular results default to Arrow tables; `output="pydata"` returns Python records.
@@ -38,6 +40,55 @@ transport unchanged. `stream()` does not fall back: if transport refuses the
 combination (for example `access="random"` with a transform, or a server without
 byte ranges), the error propagates. Use `access="random"` for seekable ranged
 reads of remote objects. `parse()` chooses the access mode itself, per format.
+
+## Schema discovery
+
+```python
+from mountainash_files import FileSourceSpec, inspect_schema
+
+result, = inspect_schema(FileSourceSpec(path="sales.csv"), infer_schema_rows=1000)
+result.schema   # pyarrow.Schema
+result.basis    # "metadata", "full" or "bounded"
+```
+
+`SchemaResult` contains `schema`, `basis`, `format_key`, `spec` and
+`skipped_members`. Selection (templates, globs, archives, transforms, profiles,
+`on_missing`) works as in `parse()`, with one result per selected input.
+
+Each built-in format runs its own parse engine over the inspected records and
+keeps only the schema, so a `full` result has the types `parse()` produces for
+the same input and spec. A result is an observation, not a contract: discovery
+does not change later parses, and a changed source can parse differently.
+
+| Basis | Meaning |
+|---|---|
+| `metadata` | Read from format metadata (Parquet footer); no records inspected |
+| `full` | Every record was inspected |
+| `bounded` | Coverage of every record was not established; later fields or types may be missing |
+
+`infer_schema_rows=None` (the default) inspects every record. A positive integer
+bounds the data records inspected per selected input; header and comment records
+are not counted. If a CSV header row comes after the Nth data record, the records
+before it are read and also contribute. A result is also `bounded` when the spec sets
+`infer_sample_rows`. Other budget values raise `ValueError` before any I/O.
+
+A budget is the only cost control. What it saves depends on the format:
+
+| Format | Fetched | Full budget | Finite budget |
+|---|---|---|---|
+| Parquet | Footer only (ranged reads; whole object with transforms or servers without ranges) | Metadata only | Same |
+| CSV / TSV, NDJSON | Whole object for a full budget; a prefix read forward and closed early for a finite one (whole object with transforms or archives) | About one parse | Only the prefix, so cost follows the budget, not the file size (UTF-16/32 NDJSON is read whole) |
+| JSON document | Whole object | About one parse | Still decodes the whole document |
+| XLSX | Whole workbook | About one parse | Still decodes the whole sheet; little faster than full |
+
+For example, on one million rows a full CSV discovery took about 0.3 s and a
+1,000-record discovery about 0.05 s, fetching about 2.6 MB of 32 MB over HTTP.
+
+XML and plugins without an inspector raise `SchemaDiscoveryUnsupportedError`
+before reading a single file, even with `on_missing="skip"`; archive members
+are checked after the archive is read. Malformed content raises
+`ParseError`, including JSON whose selected records are not tabular. A caller's
+stream passed to `inspect_schema_bytes()` is read but not closed.
 
 ## File specs and format selection
 
@@ -196,6 +247,16 @@ Non-tabular formats should set `TABULAR = False` to retain their payload type.
 handle when no transforms apply; the parser then receives a handle or `bytes`
 and must finish reading before it returns. See the
 [migration notes](migration-reader-engines.md#plugin-formats).
+
+To support schema discovery, pass `schema_inspector=` (a callable or a
+`"package.module:attr"` reference). It receives bytes or a binary stream, the
+spec and `infer_schema_rows`, and returns `(pyarrow.Schema, basis)`; it must not
+close a borrowed stream. `schema_access=` (`"bytes"`, `"random"`,
+`"sequential"`, or a callable of the spec and budget) chooses what
+`inspect_schema()` hands it when no transforms apply. Archives, transforms and
+refused ranges always supply bytes, so an inspector must handle both. Formats
+without an inspector parse normally but raise `SchemaDiscoveryUnsupportedError`
+on discovery.
 
 Registrations reject conflicting keys, suffixes and media types unless
 `override=True` is explicit. Lazy registrations accept `"package.module:attr"`

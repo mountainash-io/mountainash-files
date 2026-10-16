@@ -44,6 +44,15 @@ class FormatConflictError(FormatError):
     """Registering a format that already exists without override=True."""
 
 
+class SchemaDiscoveryUnsupportedError(FormatError):
+    """The format has no schema inspector (non-tabular formats, plugins without one)."""
+
+    def __init__(self, format_key: str, reason: str):
+        self.format_key = format_key
+        self.reason = reason
+        super().__init__(f"[{format_key}] schema discovery is not supported: {reason}")
+
+
 class FormatResolutionError(FormatError):
     """A lazy format reference failed to resolve at use time."""
 

@@ -100,3 +100,24 @@ def test_failed_plugin_is_isolated_and_surfaced(monkeypatch):
         resolve_format(format="nope")
     with pytest.raises(UnknownFormatError, match="broken"):
         resolve_format(path="data.unknownsuffix")
+
+
+def test_entry_point_plugin_registers_a_schema_inspector(monkeypatch):
+    import pyarrow as pa
+
+    from mountainash_files import inspect_schema_bytes
+    from mountainash_files.formats._registry import register_format
+
+    from _schema_plugin import TypedSpec, typed_inspect, typed_parse
+
+    def load():
+        register_format(TypedSpec, typed_parse, schema_inspector=typed_inspect)
+        return types.ModuleType("typed_plugin")
+
+    monkeypatch.setattr(
+        _registry.importlib.metadata,
+        "entry_points",
+        lambda group: [_FakeEP("typed", load=load)],
+    )
+    _discover_entrypoint_formats()
+    assert inspect_schema_bytes(b"uint8:2", "typed").schema == pa.schema([("v", pa.uint8())])

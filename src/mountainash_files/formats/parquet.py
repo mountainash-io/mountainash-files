@@ -77,10 +77,35 @@ def parquet_parse(data: bytes | BinaryIO, spec: ParquetSpec) -> pa.Table:
         raise ParseError("parquet", str(exc)) from exc
 
 
+def parquet_inspect_schema(data: bytes | BinaryIO, spec: ParquetSpec, *, infer_schema_rows: int | None = None):
+    """Footer schema with parse's projection rules; data pages are never read."""
+    try:
+        if not isinstance(data, bytes) and not data.seekable():
+            data = data.read()
+        if isinstance(data, bytes):
+            if not data:
+                raise ParseError("parquet", "Empty input")
+            reader = pq.ParquetFile(pa.BufferReader(native_buffer(data)), pre_buffer=False)
+        else:  # seekable handle: a synchronous footer read, as parquet_parse
+            reader = pq.ParquetFile(data, pre_buffer=False)
+        schema = reader.schema_arrow
+        if spec.columns:
+            fields = [schema.field(c) if c in schema.names else _leaf_field(schema, c.split(".")) for c in spec.columns]
+            schema = pa.schema(fields).with_metadata(schema.metadata or {})
+    except (StorageError, ParseError):
+        raise
+    except Exception as exc:
+        raise ParseError("parquet", str(exc)) from exc
+    return schema, "metadata"
+
+
 def parquet_serialise(data: pa.Table, spec: ParquetSpec) -> bytes:
     buf = io.BytesIO()
     pq.write_table(data, buf)
     return buf.getvalue()
 
 
-register_format(ParquetSpec, parquet_parse, serialiser=parquet_serialise, access=parquet_access)
+register_format(
+    ParquetSpec, parquet_parse, serialiser=parquet_serialise, access=parquet_access,
+    schema_inspector=parquet_inspect_schema, schema_access="random",
+)

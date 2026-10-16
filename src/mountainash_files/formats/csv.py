@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import dataclasses
 from typing import BinaryIO, ClassVar, Literal
 
@@ -204,6 +205,67 @@ def csv_parse(data: bytes | BinaryIO, spec: CsvSpec) -> pa.Table:
     return table.select([]) if spec.columns == () else table
 
 
+def csv_schema_access(spec: CsvSpec, infer_schema_rows: int | None) -> str:
+    """A finite budget needs only a prefix, so read forward and stop; otherwise read it all."""
+    return "bytes" if infer_schema_rows is None else "sequential"
+
+
+def _csv_prefix(data: bytes | BinaryIO, spec: CsvSpec, n: int) -> tuple[bytes, bool]:
+    """Input through the last header row and the Nth data record, and whether the input ended there.
+
+    Streams are read in growing chunks and lexed from the last complete record, so the work is
+    linear in the prefix. Before EOF a trailing record is complete only once its terminator has
+    arrived; an unterminated quote or a dangling escape at a chunk end means "read more".
+    """
+    try:
+        _validate_delimited_spec(spec)
+    except ValueError as exc:
+        raise ParseError(spec.FORMAT, str(exc)) from exc
+    need = max(_positions(spec)) if spec.header else 0
+    comment_rows = set(spec.comment_rows)
+    decoder = codecs.getincrementaldecoder(spec.encoding)()
+    text, consumed, number, retained, rows = "", 0, 0, 0, 0
+    size, eof = 65536, False
+    while not eof:
+        if isinstance(data, bytes):
+            chunk, eof = data, True
+        else:
+            chunk = data.read(size)
+            eof, size = not chunk, min(size * 2, 8 << 20)
+        try:
+            text += decoder.decode(chunk, final=eof)
+        except UnicodeDecodeError as exc:
+            raise ParseError(spec.FORMAT, str(exc)) from exc
+        try:
+            base = consumed
+            for record, end in iter_logical_records(text[base:], spec):
+                end += base
+                if end == len(text) and not eof:
+                    break   # the last record may still be arriving (even after an escaped terminator)
+                consumed, number = end, number + 1
+                if record == "" or number in comment_rows or (
+                        spec.comment_char is not None and record.startswith(spec.comment_char)):
+                    continue
+                retained += 1
+                rows += retained > need
+                if rows >= n and retained >= need:
+                    return text[:consumed].encode(spec.encoding), eof and consumed == len(text)
+        except ParseError:
+            if eof:
+                raise
+    return text.encode(spec.encoding), True
+
+
+def csv_inspect_schema(data: bytes | BinaryIO, spec: CsvSpec, *, infer_schema_rows: int | None = None):
+    """Schema from the CSV parse engine over every record, or over the budgeted prefix."""
+    if infer_schema_rows is None:
+        raw = data if isinstance(data, bytes) else data.read()
+        return csv_parse(raw, spec).schema, "full"
+    prefix, ended = _csv_prefix(data, spec, infer_schema_rows)
+    return csv_parse(prefix, spec).schema, "full" if ended else "bounded"
+
+
+
 def _resolve_type(dtype_str: str) -> pa.DataType:
     types: dict[str, pa.DataType] = {
         "string": pa.string(),
@@ -232,4 +294,7 @@ def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
         raise WriteError(f"Cannot serialise {spec.FORMAT}: {exc}") from exc
 
 
-register_format(CsvSpec, csv_parse, serialiser=csv_serialise)
+register_format(
+    CsvSpec, csv_parse, serialiser=csv_serialise,
+    schema_inspector=csv_inspect_schema, schema_access=csv_schema_access,
+)

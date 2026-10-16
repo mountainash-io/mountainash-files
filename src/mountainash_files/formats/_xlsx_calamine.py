@@ -69,7 +69,11 @@ def _header_cells(raw: bytes, sheet, rows: list[int]) -> list[tuple]:
         wb.close()
 
 
-def read_calamine(raw: bytes, spec) -> pa.Table:
+def read_calamine(raw: bytes, spec, limit: int | None = None) -> tuple[pa.Table, bool]:
+    """The selected sheet as a table, and whether every data row is in it.
+
+    *limit* keeps only the first N data rows (comment and header rows are never counted).
+    """
     import fastexcel
 
     reader = fastexcel.read_excel(raw)
@@ -86,7 +90,7 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
 
     probe = reader.load_sheet(sheet, header_row=None, n_rows=0)
     if probe.total_height == 0 or probe.width == 0:
-        return pa.table({})
+        return pa.table({}), True
     # calamine numbers columns from its used range; absolute_index is the sheet column.
     # Leading empty columns are restored below so the table keeps the sheet's shape.
     anchor = probe.available_columns()[0]
@@ -101,7 +105,7 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
         comments |= {i for i, v in enumerate(first) if isinstance(v, str) and v.startswith(spec.comment_char)}
 
     if height <= len([c for c in comments if 0 <= c < height]):
-        return pa.table({})   # every row is a comment: nothing to header or read
+        return pa.table({}), True   # every row is a comment: nothing to header or read
 
     headers: list[int] = []
     if spec.header:
@@ -119,8 +123,18 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
             if len(headers) == len(positions):
                 break
 
+    runs = _runs(comments | set(headers), height)
+    complete = True
+    if limit is not None and sum(n for _, n in runs) > limit:
+        complete, kept, left = False, [], limit
+        for start, n in runs:
+            if left <= 0:
+                break
+            kept.append((start, min(n, left)))
+            left -= min(n, left)
+        runs = kept
     blocks = [load(skip_rows=start, n_rows=n, schema_sample_rows=spec.infer_sample_rows)
-              for start, n in _runs(comments | set(headers), height)]
+              for start, n in runs]
     blocks = [b for b in blocks if b.num_rows]
     width = lead + max([b.num_columns for b in blocks] + [probe.width])
     if spec.header:
@@ -132,7 +146,7 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
     else:
         labels = [f"field{i + 1}" for i in range(width)]
     if not blocks:
-        return pa.table({label: pa.nulls(0) for label in labels})
+        return pa.table({label: pa.nulls(0) for label in labels}), complete
     columns = []
     for i in range(width):
         j = i - lead
@@ -143,4 +157,4 @@ def read_calamine(raw: bytes, spec) -> pa.Table:
         target = _merge_type([p.type for p in parts])
         chunks = [c for p in parts for c in _as(p, target).chunks]
         columns.append(pa.chunked_array(chunks, type=target))  # type: ignore[call-overload]  # stubs lack a DataType overload
-    return _recover_ints(pa.Table.from_arrays(columns, names=labels))
+    return _recover_ints(pa.Table.from_arrays(columns, names=labels)), complete

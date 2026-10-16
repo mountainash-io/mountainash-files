@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json as _json
+import re
 from typing import Any, BinaryIO, ClassVar, Literal, cast
 
 import pyarrow as pa
@@ -45,20 +46,46 @@ def _with_keys(table: pa.Table, keys: tuple[str, ...]) -> pa.Table:
     return pa.Table.from_arrays(columns, names=list(keys))
 
 
-def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> pa.Table | list[object]:
-    import polars as pl
-
-    raw = data.read() if hasattr(data, "read") else data
+def _utf8(raw: bytes) -> bytes:
+    """UTF-8 bytes of a JSON payload (RFC 8259 encoding detection); empty input is an error."""
     if not raw:
         raise ParseError("json", "Empty input")
-    n = spec.infer_sample_rows
-    plain = not spec.property and spec.item_type in (None, "object")
     try:
         encoding = _json.detect_encoding(raw)
         if encoding != "utf-8":
             raw = raw.decode(encoding).encode("utf-8")
-        if not raw.strip():
-            raise ParseError("json", "Empty input")
+    except UnicodeDecodeError as exc:
+        raise ParseError("json", str(exc)) from exc
+    if not raw.strip():
+        raise ParseError("json", "Empty input")
+    return raw
+
+
+def _decode_records(raw: bytes, spec: JsonSpec) -> list[object]:
+    """Stdlib decode (document or NDJSON lines), then ``property`` selection, as a record list."""
+    try:
+        source = (
+            [_json.loads(line) for line in raw.splitlines() if line.strip()]
+            if spec.ndjson
+            else _json.loads(raw)
+        )
+    except Exception as exc:  # UnicodeDecodeError, JSONDecodeError
+        raise ParseError("json", str(exc)) from exc
+    if spec.property:
+        for key in spec.property.split("."):
+            if not isinstance(source, dict) or key not in source:
+                raise ParseError("json", f"property {spec.property!r} was not found")
+            source = source[key]
+    return source if isinstance(source, list) else [source]
+
+
+def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> pa.Table | list[object]:
+    import polars as pl
+
+    raw = _utf8(data.read() if hasattr(data, "read") else data)
+    n = spec.infer_sample_rows
+    plain = not spec.property and spec.item_type in (None, "object")
+    try:
         head = raw.lstrip()[:1]
         if spec.ndjson and plain and head == b"{":
             table = pl.read_ndjson(raw, infer_schema_length=n).to_arrow()
@@ -66,23 +93,90 @@ def json_parse(data: bytes | BinaryIO, spec: JsonSpec) -> pa.Table | list[object
         if (not spec.ndjson and plain and not spec.item_keys and head == b"["
                 and raw.lstrip()[1:].lstrip()[:1] == b"{"):
             return _finish(pl.read_json(raw, infer_schema_length=n).to_arrow(), spec)
-        source = (
-            [_json.loads(line) for line in raw.splitlines() if line.strip()]
-            if spec.ndjson
-            else _json.loads(raw)
-        )
-    except ParseError:
-        raise
-    except Exception as exc:  # UnicodeDecodeError, JSONDecodeError, polars errors
+    except Exception as exc:  # polars errors
         raise ParseError("json", str(exc)) from exc
-    if spec.property:
-        for key in spec.property.split("."):
-            if not isinstance(source, dict) or key not in source:
-                raise ParseError("json", f"property {spec.property!r} was not found")
-            source = source[key]
-    records = source if isinstance(source, list) else [source]
-    out = _resolve_rows(records, spec)
+    out = _resolve_rows(_decode_records(raw, spec), spec)
     return _finish(out, spec) if isinstance(out, pa.Table) else out
+
+
+def json_schema_access(spec: JsonSpec, infer_schema_rows: int | None) -> str:
+    """NDJSON with a finite budget reads forward and stops; JSON documents need every byte."""
+    return "sequential" if spec.ndjson and infer_schema_rows is not None else "bytes"
+
+
+def _array_rows(first_line: bytes, spec: JsonSpec) -> bool:
+    """Whether rows are arrays, by _resolve_rows' rule: explicit item_type, else the first record."""
+    if spec.item_type is not None:
+        return spec.item_type == "array"
+    return first_line.lstrip()[:1] == b"["
+
+
+_LINE_END = re.compile(rb"\r\n|\r|\n")   # the boundaries bytes.splitlines() uses in _decode_records
+
+
+def _ndjson_prefix(data: bytes | BinaryIO, spec: JsonSpec, n: int) -> tuple[bytes, bool]:
+    """NDJSON through the Nth data line (an array header is extra), and whether the input ended there."""
+    if isinstance(data, bytes):
+        buffer, eof, checked = _utf8(data), True, True
+    else:
+        buffer, eof, checked, size = b"", False, False, 65536
+    pos, lines, wanted = 0, 0, None
+    while True:
+        if not eof:
+            chunk = data.read(size)   # type: ignore[union-attr]
+            eof, size = not chunk, min(size * 2, 8 << 20)
+            buffer += chunk
+        if not checked and (len(buffer) >= 4 or eof):
+            checked = True
+            encoding = _json.detect_encoding(buffer[:4]) if buffer else "utf-8"
+            if encoding == "utf-8-sig":
+                pos = 3   # skip the BOM and keep reading incrementally
+            elif encoding != "utf-8":
+                while not eof:   # UTF-16/32: line splitting needs the decoded text
+                    chunk = data.read(size)   # type: ignore[union-attr]
+                    eof, buffer = not chunk, buffer + chunk
+                buffer = _utf8(buffer)
+        if not checked:
+            continue
+        while pos < len(buffer):
+            match = _LINE_END.search(buffer, pos)
+            if match is None or (match.group() == b"\r" and match.end() == len(buffer) and not eof):
+                if not eof:
+                    break   # line, or a CRLF, still arriving
+                end = len(buffer)
+            else:
+                end = match.end()
+            line, pos = buffer[pos:end], end
+            if line.strip():
+                if wanted is None:
+                    wanted = n + (1 if spec.header and _array_rows(line, spec) else 0)
+                lines += 1
+                if lines == wanted:
+                    return buffer[:pos], eof and not buffer[pos:].strip()
+        if eof:
+            return buffer, True
+
+
+def json_inspect_schema(data: bytes | BinaryIO, spec: JsonSpec, *, infer_schema_rows: int | None = None):
+    """Schema from the JSON parse engine over every record, or over the first N selected records."""
+    n = infer_schema_rows
+    if spec.ndjson and n is not None:
+        prefix, complete = _ndjson_prefix(data, spec, n)
+        table = json_parse(prefix, spec)
+    else:
+        raw = data if isinstance(data, bytes) else data.read()
+        if n is None:
+            table, complete = json_parse(raw, spec), True
+        else:
+            records = _decode_records(_utf8(raw), spec)
+            keep = n + (1 if records and isinstance(records[0], list) and spec.header
+                        and spec.item_type in (None, "array") else 0)
+            sliced = dataclasses.replace(spec, property=None)
+            table, complete = json_parse(_json.dumps(records[:keep]).encode(), sliced), len(records) <= keep
+    if not isinstance(table, pa.Table):
+        raise ParseError("json", "the selected records are not tabular")
+    sampled = spec.infer_sample_rows is not None
+    return table.schema, "full" if complete and not sampled else "bounded"
 
 
 def _resolve_rows(records: list[object], spec: JsonSpec) -> pa.Table | list[object]:
@@ -150,4 +244,6 @@ register_format(
     json_parse,
     serialiser=json_serialise,
     suffix_overrides={".ndjson": {"ndjson": True}, ".jsonl": {"ndjson": True}},
+    schema_inspector=json_inspect_schema,
+    schema_access=json_schema_access,
 )
