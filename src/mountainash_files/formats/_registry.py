@@ -94,7 +94,7 @@ def _register_builtin_formats() -> None:
         parquet_serialise,
     )
     from mountainash_files.formats.tsv import TsvSpec
-    from mountainash_files.formats.xlsx import XlsxSpec, xlsx_parse
+    from mountainash_files.formats.xlsx import XlsxSpec, xlsx_inspect_schema, xlsx_parse
     from mountainash_files.formats.xml import XmlSpec, xml_parse, xml_serialise
 
     register_format(
@@ -123,7 +123,7 @@ def _register_builtin_formats() -> None:
         TsvSpec, csv_parse, serialiser=csv_serialise,
         schema_inspector=csv_inspect_schema, schema_access=csv_schema_access, override=True,
     )
-    register_format(XlsxSpec, xlsx_parse, override=True)
+    register_format(XlsxSpec, xlsx_parse, schema_inspector=xlsx_inspect_schema, override=True)
     register_format(XmlSpec, xml_parse, serialiser=xml_serialise, override=True)
 
 

@@ -333,3 +333,13 @@ def test_utf16_ndjson_stream_matches_bytes():
     from_stream = inspect_schema_bytes(Trickle(wire, 5), spec, infer_schema_rows=2)
     assert from_stream.schema == inspect_schema_bytes(wire, spec, infer_schema_rows=2).schema
     assert from_stream.schema == pa.schema([("a", pa.int64())])
+
+
+def test_xlsx_discovery_without_the_extra_raises_missing_dependency(monkeypatch):
+    import sys
+
+    from mountainash_files import MissingDependencyError
+
+    monkeypatch.setitem(sys.modules, "fastexcel", None)   # import fails as if the extra were absent
+    with pytest.raises(MissingDependencyError):
+        inspect_schema_bytes(b"PK\x03\x04 not inspected", "xlsx", infer_schema_rows=1)
