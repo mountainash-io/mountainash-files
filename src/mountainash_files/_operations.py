@@ -6,7 +6,6 @@ import io
 import logging
 import typing as t
 from collections.abc import Iterator
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from mountainash_transport import (
@@ -146,15 +145,9 @@ def _write_bytes(
     create_path: bool,
     transforms: Pipeline | None,
 ) -> None:
-    """Write bytes via transport, applying transforms (compress/encrypt)."""
-    if "://" not in path:
-        p = Path(path)
-        if create_path:
-            p.parent.mkdir(parents=True, exist_ok=True)
-        elif not p.parent.exists():
-            raise WriteError(f"Parent directory does not exist: {p.parent}")
+    """Write bytes via transport, applying transforms (compress/encrypt) and the parent policy."""
     facade = _make_facade(path, storage_profile, auth_profile)
-    facade.write(path, data, pipeline=transforms)
+    facade.write(path, data, pipeline=transforms, create_parents=create_path)
 
 
 def parse(
