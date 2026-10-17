@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 
 import pytest
+from mountainash_transport import PathNotFoundError
 
 from mountainash_files import stream
 from mountainash_files.specs.source import FileSourceSpec
@@ -27,7 +28,7 @@ class TestStreamLocal:
 
     def test_stream_missing_raises(self):
         source = FileSourceSpec(path="/nonexistent/file.csv")
-        with pytest.raises(Exception):
+        with pytest.raises(PathNotFoundError):
             with stream(source) as s:
                 s.read()
 

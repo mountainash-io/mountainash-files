@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pyarrow as pa
 import pytest
+from mountainash_transport import PathNotFoundError
 
 from mountainash_files import parse
 from mountainash_files.specs.source import FileSourceSpec
@@ -121,7 +122,7 @@ class TestParseLocalFile:
 
     def test_missing_file_raises(self):
         source = FileSourceSpec(path="/nonexistent/file.csv")
-        with pytest.raises(Exception):  # PathNotFoundError or FileNotFoundError
+        with pytest.raises(PathNotFoundError):
             parse(source)
 
     def test_missing_file_skip(self):

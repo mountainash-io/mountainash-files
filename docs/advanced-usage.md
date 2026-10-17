@@ -192,9 +192,17 @@ gzip members before parsing. Unknown member formats fail by default;
 `skipped_members`. An archive with no recognised members still raises an error.
 No matching members raises an archive extraction error.
 
-For a missing source, `on_missing="skip"` makes `parse()` return `[]`, `copy()`
-do nothing and `stream()` yield an empty stream. It does not suppress permission,
-format or parse errors. Unknown suffixes are resolved before normal-file reads.
+For a missing source, `on_missing="skip"` makes `parse()` and `inspect_schema()`
+return `[]`, `copy()` do nothing and `stream()` yield an empty stream. Only a
+missing source (`PathNotFoundError`) is skipped; permission, connection, format
+and parse errors still raise. Unknown suffixes are resolved before normal-file
+reads.
+
+Storage failures raise mountainash-transport's exceptions unchanged, with the
+backend's own error as `__cause__`: `PathNotFoundError`, `AuthenticationError`,
+`PermissionDeniedError` (a subclass of `AuthenticationError`; catch it first),
+`StorageConnectionError`, or `StorageError` for other backend failures. Content
+that a format cannot parse raises files' `ParseError`.
 
 ## Compression and storage
 
