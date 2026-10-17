@@ -112,8 +112,11 @@ copying and streaming:
 | `gpg: GPG \| None = None` | Configured transport decoder for inferred `.gpg`, `.pgp` and `.asc` transforms |
 | `gzip: Gzip \| None = None` | Configured transport decoder for inferred `.gz` and `.gzip` transforms |
 
-Sinks accept `write_disposition="replace"` or `"append"` and `create_path=True`
-(create local parent directories). The `archive` field does not create an archive
+Sinks accept `write_disposition="replace"` or `"append"`. `create_path=True`
+(the default) creates missing parent directories on storage that has them
+(local, SFTP); `create_path=False` raises transport's `PathNotFoundError` instead
+and creates nothing. Object stores and HTTP have no directories, so the setting
+has no effect there. The `archive` field does not create an archive
 on write; use a transport transform for gzip output.
 
 Explicit format specs take precedence over suffixes. Format keys are `csv`,

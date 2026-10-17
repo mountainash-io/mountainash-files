@@ -7,8 +7,9 @@ import pyarrow as pa
 import pyarrow.csv as pcsv
 import pyarrow.parquet as pq
 import pytest
+from mountainash_transport import PathNotFoundError
 
-from mountainash_files import AppendSchemaMismatchError, write, parse, FileSourceSpec
+from mountainash_files import AppendSchemaMismatchError, copy, write, parse, FileSourceSpec
 from mountainash_files.specs.sink import FileSinkSpec
 from mountainash_files._exceptions import WriteError
 from mountainash_files.formats.csv import CsvSpec
@@ -75,8 +76,17 @@ class TestWriteLocal:
             create_path=False,
         )
         table = pa.table({"x": [1]})
-        with pytest.raises(WriteError, match="Parent directory does not exist"):
+        with pytest.raises(PathNotFoundError):
             write(sink, table)
+        assert not (tmp_path / "nonexistent").exists()
+
+    def test_copy_no_create_path_raises(self, tmp_path):
+        source = tmp_path / "in.csv"
+        source.write_bytes(b"x\n1\n")
+        sink = FileSinkSpec(path=str(tmp_path / "nonexistent" / "out.csv"), create_path=False)
+        with pytest.raises(PathNotFoundError):
+            copy(FileSourceSpec(path=str(source)), sink)
+        assert not (tmp_path / "nonexistent").exists()
 
     def test_write_explicit_format_spec(self, tmp_path):
         table = pa.table({"a": [1], "b": [2]})
