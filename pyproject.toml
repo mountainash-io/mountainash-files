@@ -37,3 +37,54 @@ all = ["mountainash-files[xlsx,xml,s3,gcs,azure,sftp,encryption]"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Storage boundary (principle: storage through transport's public API).
+# Files reaches storage only through the mountainash_transport package root:
+# no direct filesystem, network or SDK access, and no transport submodules.
+# PTH123 is selected only because it is ruff's sole check for builtin open();
+# its "use Path.open()" hint does not apply here (pathlib.Path is banned too).
+[tool.ruff.lint]
+extend-select = ["TID251", "PTH123"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pathlib.Path".msg = "storage access goes through mountainash_transport (PurePosixPath is fine for string handling)"
+"pathlib.PosixPath".msg = "storage access goes through mountainash_transport"
+"pathlib.WindowsPath".msg = "storage access goes through mountainash_transport"
+"io.open".msg = "storage access goes through mountainash_transport"
+"os.open".msg = "storage access goes through mountainash_transport"
+"os.fdopen".msg = "storage access goes through mountainash_transport"
+"os.stat".msg = "storage access goes through mountainash_transport"
+"os.lstat".msg = "storage access goes through mountainash_transport"
+"os.listdir".msg = "storage access goes through mountainash_transport"
+"os.scandir".msg = "storage access goes through mountainash_transport"
+"os.walk".msg = "storage access goes through mountainash_transport"
+"os.mkdir".msg = "storage access goes through mountainash_transport"
+"os.makedirs".msg = "storage access goes through mountainash_transport"
+"os.remove".msg = "storage access goes through mountainash_transport"
+"os.unlink".msg = "storage access goes through mountainash_transport"
+"os.rename".msg = "storage access goes through mountainash_transport"
+"os.replace".msg = "storage access goes through mountainash_transport"
+"os.rmdir".msg = "storage access goes through mountainash_transport"
+"os.path.exists".msg = "storage access goes through mountainash_transport"
+"os.path.isfile".msg = "storage access goes through mountainash_transport"
+"os.path.isdir".msg = "storage access goes through mountainash_transport"
+"os.path.getsize".msg = "storage access goes through mountainash_transport"
+"glob".msg = "use mountainash_files._glob, which lists through transport"
+"shutil".msg = "storage access goes through mountainash_transport"
+"urllib.request".msg = "storage access goes through mountainash_transport"
+"requests".msg = "storage access goes through mountainash_transport"
+"httpx".msg = "storage access goes through mountainash_transport"
+"boto3".msg = "storage access goes through mountainash_transport"
+"botocore".msg = "storage access goes through mountainash_transport"
+"paramiko".msg = "storage access goes through mountainash_transport"
+"fsspec".msg = "storage access goes through mountainash_transport"
+"google.cloud.storage".msg = "storage access goes through mountainash_transport"
+"azure.storage".msg = "storage access goes through mountainash_transport"
+"pyarrow.OSFile".msg = "storage access goes through mountainash_transport"
+"pyarrow.memory_map".msg = "storage access goes through mountainash_transport"
+"pyarrow.fs".msg = "storage access goes through mountainash_transport"
+"mountainash_transport._core".msg = "import from the mountainash_transport package root only"
+"mountainash_transport.connections".msg = "import from the mountainash_transport package root only"
+"mountainash_transport.messaging".msg = "import from the mountainash_transport package root only"
+"mountainash_transport.settings".msg = "import from the mountainash_transport package root only"
+"mountainash_transport.storage".msg = "import from the mountainash_transport package root only"
