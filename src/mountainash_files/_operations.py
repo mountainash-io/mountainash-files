@@ -234,8 +234,8 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
                 infer=False if source.infer is None else source.infer,
                 gpg=source.gpg, gzip=source.gzip,
             )
-        except (FileNotFoundError, Exception) as exc:
-            if source.on_missing == "skip" and _is_not_found(exc):
+        except PathNotFoundError:
+            if source.on_missing == "skip":
                 return []
             raise
 
@@ -303,8 +303,8 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
     _, on_source = make(format_key, spec)
     try:
         result = on_source(path, storage_profile, auth_profile, source)
-    except (FileNotFoundError, Exception) as exc:
-        if source.on_missing == "skip" and _is_not_found(exc):
+    except PathNotFoundError:
+        if source.on_missing == "skip":
             return []
         raise
     return [result]
@@ -493,9 +493,7 @@ def write(
             raw = _read_bytes(
                 path, storage_profile, auth_profile, sink.transforms, infer=False
             )
-        except Exception as exc:
-            if not _is_not_found(exc):
-                raise
+        except PathNotFoundError:
             data = incoming
         else:
             read_spec = (
@@ -546,8 +544,8 @@ def copy(
             src_path, src_profile, src_auth, source.transforms,
             infer=source.infer, gpg=source.gpg, gzip=source.gzip,
         )
-    except (FileNotFoundError, Exception) as exc:
-        if source.on_missing == "skip" and _is_not_found(exc):
+    except PathNotFoundError:
+        if source.on_missing == "skip":
             return
         raise
 
@@ -586,17 +584,12 @@ def stream(
             gpg=source.gpg, gzip=source.gzip,
             access=access, range_policy=range_policy,
         )
-    except Exception as exc:
-        if source.on_missing != "skip" or not _is_not_found(exc):
+    except PathNotFoundError:
+        if source.on_missing != "skip":
             raise
         handle = io.BytesIO()
     with handle:
         yield handle
-
-
-def _is_not_found(exc: Exception) -> bool:
-    """Check if an exception represents a file-not-found condition."""
-    return isinstance(exc, (FileNotFoundError, PathNotFoundError))
 
 
 def _resolve_format_spec(format: str | FormatSpec) -> tuple[str, FormatSpec]:

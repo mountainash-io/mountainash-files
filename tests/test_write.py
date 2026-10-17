@@ -75,7 +75,7 @@ class TestWriteLocal:
             create_path=False,
         )
         table = pa.table({"x": [1]})
-        with pytest.raises((WriteError, FileNotFoundError)):
+        with pytest.raises(WriteError, match="Parent directory does not exist"):
             write(sink, table)
 
     def test_write_explicit_format_spec(self, tmp_path):
