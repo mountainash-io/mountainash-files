@@ -16,11 +16,12 @@ missing report: 0 results
 ```
 
 Operations expand `{region}` from `params`. A source's `path` is the base
-directory when `glob` is supplied; matching local files are read in sorted order.
+directory when `glob` is supplied; matching files are read in sorted order.
 Results remain separate until the application combines them.
 
 An unmatched glob returns `[]`. `on_missing="skip"` also returns `[]` for a
-missing file, but does not hide format, parse or permission errors. Remote
-globs require the backend's object-listing capability.
+missing file, but does not hide format, parse or permission errors. Globs use
+the same path-style rule (`*` within a directory, `**` across) on every backend
+that supports object listing.
 
 Next: [ZIP archives](../zip_archives/).
