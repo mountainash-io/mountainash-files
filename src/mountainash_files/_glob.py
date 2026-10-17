@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import fnmatch
 import typing as t
-from pathlib import Path
+from fnmatch import fnmatchcase
 
 from mountainash_transport import StorageFacade
 
@@ -18,40 +17,34 @@ def resolve_glob(
     storage_profile: "StorageProfileProtocol | None" = None,
     auth_profile: "AuthProfile | None" = None,
 ) -> list[str]:
-    """Resolve a glob pattern against a base path.
+    """Sorted paths of the files beneath *base_path* whose relative path matches *pattern*.
 
-    Returns a sorted list of matching file paths (not directories).
-    Callers pass already-materialised profile objects — name resolution
-    happens once, upstream in the operation entry points.
+    One rule for every backend: ``*``, ``?`` and ``[...]`` match within one path segment and
+    ``**`` matches zero or more segments. Listing goes through transport's ``list_objects``;
+    callers pass already-materialised profile objects.
     """
-    if _is_remote(base_path):
-        return _resolve_remote_glob(base_path, pattern, storage_profile, auth_profile)
-    return _resolve_local_glob(base_path, pattern)
-
-
-def _resolve_local_glob(base_path: str, pattern: str) -> list[str]:
-    base = Path(base_path)
-    if not base.is_dir():
+    parts = [p for p in pattern.split("/") if p not in ("", ".")]
+    base = base_path if base_path.endswith("/") else base_path + "/"
+    facade = StorageFacade.from_path(base, storage_profile, auth_profile=auth_profile)
+    level = facade.list_objects(base, delimiter="/")
+    if len(parts) == 1 and parts[0] != "**":
+        return sorted(e.path for e in level.objects if e.name and fnmatchcase(e.name, parts[0]))
+    # Object stores may hold empty-named "directory marker" keys; they are not files.
+    first = next((e for e in (*level.objects, *level.common_prefixes) if e.name), None)
+    if first is None:
         return []
-    return sorted(str(p) for p in base.glob(pattern) if p.is_file())
-
-
-def _resolve_remote_glob(
-    base_path: str,
-    pattern: str,
-    storage_profile: "StorageProfileProtocol | None",
-    auth_profile: "AuthProfile | None",
-) -> list[str]:
-    facade = StorageFacade.from_path(
-        base_path, storage_profile, auth_profile=auth_profile
-    )
-    listing = facade.list_objects(base_path, delimiter=None)
+    # Backends render paths differently (absolute local paths, s3:// keys), so take the root
+    # from an entry rather than rebuilding it from base_path.
+    root = first.path.rstrip("/")[: -len(first.name)]
     return sorted(
-        entry.path
-        for entry in listing.objects
-        if fnmatch.fnmatch(entry.path.split("/")[-1], pattern)
+        e.path for e in facade.list_objects(base, delimiter=None).objects
+        if e.name and e.path.startswith(root) and _matches(e.path[len(root):].split("/"), parts)
     )
 
 
-def _is_remote(path: str) -> bool:
-    return "://" in path
+def _matches(segments: list[str], parts: list[str]) -> bool:
+    if not parts:
+        return not segments
+    if parts[0] == "**":
+        return any(_matches(segments[i:], parts[1:]) for i in range(len(segments) + 1))
+    return bool(segments) and fnmatchcase(segments[0], parts[0]) and _matches(segments[1:], parts[1:])

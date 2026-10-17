@@ -183,9 +183,16 @@ See the [append recipe](../examples/parquet_append/).
 
 ## Globs, archives and missing files
 
-For local files, `glob` selects sorted file paths beneath the source's base
-directory. Remote globs require transport's object-listing capability and match
-the pattern against object basenames. A glob with no matches returns `[]`.
+`glob` selects the files beneath the source's base path whose path relative to
+that base matches the pattern, sorted. The rule is the same on every backend:
+`*`, `?` and `[...]` match within one path segment, and `**` matches zero or
+more segments (`**/*.csv` finds CSV files at any depth; `**` alone matches every
+file). Listing uses transport's `list_objects`, so globs work wherever transport
+can enumerate (local, SFTP, S3 family). A missing base or no matches returns
+`[]`; a base that is a file raises transport's `StorageError`.
+
+Earlier releases matched only the basename on object stores, so `*.csv` also
+selected nested objects there. Use `**/*.csv` for that.
 
 `ZipArchive(file_pattern="*.csv")` selects members and sorts by name by default.
 Each selected member produces a result; its suffix selects the format unless
