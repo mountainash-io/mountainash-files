@@ -115,6 +115,22 @@ Named profiles and explicit secret-store selection are covered in
 [profiles and migration](docs/profiles.md). Available operations depend on the
 transport backend; having a profile or an extra does not implement a backend.
 
+## Untrusted file contents
+
+**Archives.** Zip and gzip extraction is bounded. `ZipArchive` and
+`GzipCompression` take `max_decompressed_bytes` (default 1 GiB, which is the
+total across all extracted members, including an inner gzip layer). `ZipArchive`
+also takes `max_members` (default 10,000 members after `file_pattern`).
+Extraction streams with a running byte count, so if a limit is exceeded it raises
+`ArchiveLimitError` before the whole payload is held in memory. For trusted
+sources you can raise the limits, for example
+`ZipArchive(max_decompressed_bytes=8 * 1024**3)`.
+
+**CSV/TSV formula cells.** The CSV and TSV writers write cell values unchanged.
+A value starting with `=`, `+`, `-` or `@` may be evaluated as a formula when the
+export is opened in a spreadsheet application. If exports of untrusted data may be
+opened that way, sanitise those cells before writing them.
+
 ## Learn more
 
 Explore the [file recipes](examples/): each runs offline and independently,

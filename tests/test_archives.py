@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from mountainash_files._archives import unpack_archive, ArchiveExtractionError, ArchiveEmptyMatchError
+from mountainash_files._archives import unpack_archive, ArchiveExtractionError, ArchiveEmptyMatchError, ArchiveLimitError
 from mountainash_files import FileSourceSpec, ParseError, parse
 from mountainash_files.specs.archive import ZipArchive, GzipCompression
 
@@ -127,3 +127,76 @@ def test_file_pattern_exclusion_is_not_unrecognised(tmp_path):
     )
     assert len(results) == 1
     assert results[0].skipped_members == ()
+
+
+class TestDecompressionLimits:
+    """Item 385: bounded decompression for hostile archives."""
+
+    BOMB = 64 * 1024 * 1024  # 64 MiB of zeros compresses to ~64 KiB
+
+    @staticmethod
+    def _zip(members: dict[str, bytes]) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for name, payload in members.items():
+                zf.writestr(name, payload)
+        return buf.getvalue()
+
+    def test_gzip_over_size_limit_raises(self):
+        data = gzip.compress(b"\0" * self.BOMB)
+        with pytest.raises(ArchiveLimitError, match="decompressed"):
+            list(unpack_archive(data, GzipCompression(max_decompressed_bytes=1024 * 1024)))
+
+    def test_zip_over_size_limit_raises(self):
+        data = self._zip({"a.csv": b"\0" * self.BOMB})
+        with pytest.raises(ArchiveLimitError, match="decompressed"):
+            list(unpack_archive(data, ZipArchive(max_decompressed_bytes=1024 * 1024)))
+
+    def test_zip_size_limit_is_total_across_members(self):
+        data = self._zip({f"{i}.csv": b"x" * 600 for i in range(3)})
+        with pytest.raises(ArchiveLimitError):
+            list(unpack_archive(data, ZipArchive(max_decompressed_bytes=1000)))
+
+    def test_zip_inner_gzip_counts_against_limit(self):
+        data = self._zip({"a.csv.gz": gzip.compress(b"\0" * self.BOMB)})
+        with pytest.raises(ArchiveLimitError):
+            list(unpack_archive(
+                data,
+                ZipArchive(max_decompressed_bytes=1024 * 1024, inner=GzipCompression()),
+            ))
+
+    def test_zip_over_member_limit_raises(self):
+        data = self._zip({f"{i}.csv": b"a\n1\n" for i in range(5)})
+        with pytest.raises(ArchiveLimitError, match="members"):
+            list(unpack_archive(data, ZipArchive(max_members=4)))
+
+    def test_limit_error_is_extraction_error(self):
+        assert issubclass(ArchiveLimitError, ArchiveExtractionError)
+
+    def test_bomb_does_not_allocate_full_payload(self):
+        import tracemalloc
+
+        data = gzip.compress(b"\0" * self.BOMB)
+        tracemalloc.start()
+        with pytest.raises(ArchiveLimitError):
+            list(unpack_archive(data, GzipCompression(max_decompressed_bytes=1024 * 1024)))
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        assert peak < 16 * 1024 * 1024
+
+    def test_override_raises_limits(self):
+        payload = b"x" * 5000
+        assert list(unpack_archive(gzip.compress(payload), GzipCompression(max_decompressed_bytes=5000))) == [("", payload)]
+        data = self._zip({f"{i}.csv": b"a" for i in range(5)})
+        assert len(list(unpack_archive(data, ZipArchive(max_members=5)))) == 5
+
+    def test_defaults_allow_normal_archives(self):
+        assert ZipArchive().max_decompressed_bytes > 0 and ZipArchive().max_members > 0
+        data = (FIXTURES / "sample.zip").read_bytes()
+        assert len(list(unpack_archive(data, ZipArchive()))) == 2
+
+    def test_parse_surfaces_limit_error(self, tmp_path):
+        path = tmp_path / "bomb.zip"
+        path.write_bytes(self._zip({"a.csv": b"a\n" + b"1\n" * 1_000_000}))
+        with pytest.raises(ArchiveLimitError):
+            parse(FileSourceSpec(path=str(path), archive=ZipArchive(max_decompressed_bytes=1000)))
