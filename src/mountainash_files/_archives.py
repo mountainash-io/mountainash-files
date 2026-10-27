@@ -4,8 +4,7 @@ import fnmatch
 import gzip
 import io
 import zipfile
-from collections.abc import Iterator
-from typing import IO
+from collections.abc import Callable, Iterator
 
 from mountainash_files.specs.archive import GzipCompression, ZipArchive
 
@@ -31,9 +30,9 @@ class _Budget:
         self.limit = limit
         self.used = 0
 
-    def read_all(self, stream: IO[bytes], label: str) -> bytes:
+    def read_all(self, read: Callable[[int], bytes], label: str) -> bytes:
         out = bytearray()
-        while chunk := stream.read(min(_CHUNK, self.limit - self.used + 1)):
+        while chunk := read(min(_CHUNK, self.limit - self.used + 1)):
             self.used += len(chunk)
             if self.used > self.limit:
                 raise ArchiveLimitError(
@@ -63,7 +62,7 @@ def _unpack_gzip(data: bytes, archive: GzipCompression) -> Iterator[tuple[str, b
     budget = _Budget(archive.max_decompressed_bytes)
     try:
         with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
-            decompressed = budget.read_all(stream, "gzip")
+            decompressed = budget.read_all(stream.read, "gzip")
     except ArchiveLimitError:
         raise
     except Exception as exc:
@@ -113,7 +112,7 @@ def _unpack_zip(data: bytes, archive: ZipArchive) -> Iterator[tuple[str, bytes]]
             with zf.open(name, pwd=pwd) as member:
                 if isinstance(archive.inner, GzipCompression):
                     with gzip.GzipFile(fileobj=member) as inner:
-                        member_data = budget.read_all(inner, f"zip member {name!r}")
+                        member_data = budget.read_all(inner.read, f"zip member {name!r}")
                 else:
-                    member_data = budget.read_all(member, f"zip member {name!r}")
+                    member_data = budget.read_all(member.read, f"zip member {name!r}")
             yield (name, member_data)
