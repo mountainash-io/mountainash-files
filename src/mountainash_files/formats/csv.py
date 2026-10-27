@@ -45,6 +45,9 @@ class CsvSpec(FormatSpec):
     columns: tuple[str, ...] | None = None
     dtypes: tuple[tuple[str, str], ...] | None = None
     temporal: Literal["infer", "text"] = "infer"
+    # Write-only: prefix string cells (and header labels) that a spreadsheet
+    # would evaluate as a formula with "'". Lossy; parsing does not reverse it.
+    formula_neutralise: bool = False
 
     def __post_init__(self) -> None:
         if self.temporal not in ("infer", "text"):
@@ -278,6 +281,13 @@ def _resolve_type(dtype_str: str) -> pa.DataType:
     return types.get(dtype_str, pa.string())
 
 
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")  # OWASP CSV-injection leading characters
+
+
+def _neutralise(value: object) -> object:
+    return "'" + value if isinstance(value, str) and value.startswith(_FORMULA_TRIGGERS) else value
+
+
 def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
     try:
         _validate_delimited_spec(spec)
@@ -288,6 +298,8 @@ def csv_serialise(data: pa.Table, spec: CsvSpec) -> bytes:
         if spec.header:
             rows.append(tuple(data.column_names))
         rows.extend(zip(*columns))
+        if spec.formula_neutralise:
+            rows = [tuple(_neutralise(v) for v in row) for row in rows]
         encoded_rows = [encode_record(row, spec) for row in rows]
         return "".join(encoded_rows).encode(spec.encoding)
     except (ParseError, ValueError, TypeError, LookupError) as exc:

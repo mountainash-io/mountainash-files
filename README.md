@@ -126,10 +126,13 @@ Extraction streams with a running byte count, so if a limit is exceeded it raise
 sources you can raise the limits, for example
 `ZipArchive(max_decompressed_bytes=8 * 1024**3)`.
 
-**CSV/TSV formula cells.** The CSV and TSV writers write cell values unchanged.
-A value starting with `=`, `+`, `-` or `@` may be evaluated as a formula when the
-export is opened in a spreadsheet application. If exports of untrusted data may be
-opened that way, sanitise those cells before writing them.
+**CSV/TSV formula cells.** By default the CSV and TSV writers write cell values
+unchanged. A value starting with `=`, `+`, `-`, `@`, a tab or a carriage return may
+be evaluated as a formula when the export is opened in a spreadsheet application.
+Set `CsvSpec(formula_neutralise=True)` (or the same on `TsvSpec`) to prefix such
+string cells and header labels with `'`. This changes the data: the prefix is
+written into the file and is not removed when the file is parsed, and numeric
+values are never altered. Leave it off for machine-to-machine exports.
 
 ## Learn more
 

@@ -239,3 +239,32 @@ def test_header_only_input_honours_columns_and_dtypes():
 def test_blank_only_input_gives_empty_table(spec):
     t = csv_parse(b"\n\n", spec)
     assert t.num_rows == 0 and t.num_columns == 0
+
+
+class TestFormulaNeutralise:
+    """Backlog 385 (F-2): opt-in neutralisation of spreadsheet-formula cells."""
+
+    TABLE = pa.table({
+        "=label": ["=SUM(A1)", "+1", "-cmd", "@x", "\tTAB", "\rCR", "plain", "a=b", None, ""],
+        "n": [-5, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    })
+
+    @pytest.mark.parametrize("spec_cls", [CsvSpec, TsvSpec])
+    def test_default_writes_cells_verbatim(self, spec_cls):
+        spec = spec_cls()
+        assert csv_parse(csv_serialise(self.TABLE, spec), spec).column(0).to_pylist()[:4] == [
+            "=SUM(A1)", "+1", "-cmd", "@x",
+        ]
+
+    @pytest.mark.parametrize("spec_cls", [CsvSpec, TsvSpec])
+    def test_opt_in_prefixes_trigger_cells_including_header(self, spec_cls):
+        spec = spec_cls(formula_neutralise=True)
+        out = csv_parse(csv_serialise(self.TABLE, spec), spec)
+        assert out.column_names == ["'=label", "n"]
+        assert out.column(0).to_pylist()[:8] == [
+            "'=SUM(A1)", "'+1", "'-cmd", "'@x", "'\tTAB", "'\rCR", "plain", "a=b",
+        ]
+
+    def test_non_string_values_untouched(self):
+        spec = CsvSpec(formula_neutralise=True)
+        assert csv_parse(csv_serialise(self.TABLE, spec), spec).column("n").to_pylist()[0] == -5
