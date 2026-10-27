@@ -1,7 +1,7 @@
 # mountainash-files
 
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Parse and write structured files through one API: CSV, TSV, JSON, Parquet, Excel
 and XML, on local disk or storage supported by `mountainash-transport`. File
@@ -158,4 +158,4 @@ auth-client owns authentication models and OAuth flows.
 
 ## License
 
-MIT
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE).
