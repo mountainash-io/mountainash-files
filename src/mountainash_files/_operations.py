@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import GPG, Gzip, RangePolicy, StorageProfileProtocol
+    from mountainash_transport.location import LocationPolicy
 
 _VALID_OUTPUTS = ("arrow", "pydata")
 _logger = logging.getLogger(__name__)
@@ -84,11 +85,12 @@ def _normalise_output(data: Any, output: str, spec: FormatSpec) -> Any:
 
 def _resolve_profiles(
     spec: FileSpec,
-) -> tuple["StorageProfileProtocol | None", "AuthProfile | None"]:
+) -> tuple["StorageProfileProtocol | None", "AuthProfile | None", "LocationPolicy | None"]:
     """Materialise the spec's profile fields (spec semantics table).
 
     A string storage_profile resolves via transport's resolve_storage;
-    an explicitly passed auth_profile object always wins.
+    an explicitly passed auth_profile object always wins. The spec's location policy
+    is returned beside them so every caller passes all three to its facades.
     """
     storage = spec.storage_profile
     if isinstance(storage, str):
@@ -97,16 +99,17 @@ def _resolve_profiles(
         profile, auth = resolve_storage(storage)
         if spec.auth_profile is not None:
             auth = spec.auth_profile
-        return profile, auth
-    return storage, spec.auth_profile
+        return profile, auth, spec.policy
+    return storage, spec.auth_profile, spec.policy
 
 
 def _make_facade(
     path: str,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
+    policy: "LocationPolicy | None",
 ) -> StorageFacade:
-    return StorageFacade.from_path(path, storage_profile, auth_profile=auth_profile)
+    return StorageFacade.from_path(path, storage_profile, auth_profile=auth_profile, policy=policy)
 
 
 def _read_infer(transforms: Pipeline | None, infer: bool | None) -> bool:
@@ -118,6 +121,7 @@ def _read_bytes(
     path: str,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
+    policy: "LocationPolicy | None",
     transforms: Pipeline | None,
     *,
     infer: bool | None = None,
@@ -130,7 +134,7 @@ def _read_bytes(
     Archive extraction and append disable inference unless explicitly overridden
     by the source. GPG inference requires a configured GPG instance.
     """
-    facade = _make_facade(path, storage_profile, auth_profile)
+    facade = _make_facade(path, storage_profile, auth_profile, policy)
     return facade.read(
         path, pipeline=transforms, infer=_read_infer(transforms, infer),
         gpg=gpg, gzip=gzip,
@@ -142,11 +146,12 @@ def _write_bytes(
     data: bytes,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
+    policy: "LocationPolicy | None",
     create_path: bool,
     transforms: Pipeline | None,
 ) -> None:
     """Write bytes via transport, applying transforms (compress/encrypt) and the parent policy."""
-    facade = _make_facade(path, storage_profile, auth_profile)
+    facade = _make_facade(path, storage_profile, auth_profile, policy)
     facade.write(path, data, pipeline=transforms, create_parents=create_path)
 
 
@@ -171,9 +176,9 @@ def parse(
         def on_bytes(data: bytes) -> ParseResult:
             return wrap(parser(data, spec))
 
-        def on_source(path, storage_profile, auth_profile, src) -> ParseResult:
+        def on_source(path, storage_profile, auth_profile, policy, src) -> ParseResult:
             run = lambda data: parser(data, spec)  # noqa: E731
-            return wrap(_with_access(get_access(format_key, spec), run, path, storage_profile, auth_profile, src))
+            return wrap(_with_access(get_access(format_key, spec), run, path, storage_profile, auth_profile, policy, src))
 
         return on_bytes, on_source
 
@@ -188,13 +193,13 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
 
     ``make(format_key, spec)`` resolves the format's callable before any I/O and returns
     ``(on_bytes, on_source)``: archive members are handed over as bytes; a single file is
-    acquired by ``on_source(path, storage_profile, auth_profile, source)``.
+    acquired by ``on_source(path, storage_profile, auth_profile, policy, source)``.
     """
     path = source.path
     if params:
         path = path.format(**params)
 
-    storage_profile, auth_profile = _resolve_profiles(source)
+    storage_profile, auth_profile, policy = _resolve_profiles(source)
 
     # Glob resolution
     if source.glob is not None:
@@ -205,6 +210,7 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
             source.glob,
             storage_profile=storage_profile,
             auth_profile=auth_profile,
+            policy=policy,
         )
         results = []
         for file_path in paths:
@@ -214,6 +220,7 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
                 glob=None,
                 storage_profile=storage_profile,
                 auth_profile=auth_profile,
+                policy=policy,
             )
             results.extend(_read_source(child_source, params=None, make=make))
         return results
@@ -223,7 +230,7 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
     if source.archive is not None:
         try:
             raw = _read_bytes(
-                path, storage_profile, auth_profile, source.transforms,
+                path, storage_profile, auth_profile, policy, source.transforms,
                 infer=False if source.infer is None else source.infer,
                 gpg=source.gpg, gzip=source.gzip,
             )
@@ -295,7 +302,7 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
 
     _, on_source = make(format_key, spec)
     try:
-        result = on_source(path, storage_profile, auth_profile, source)
+        result = on_source(path, storage_profile, auth_profile, policy, source)
     except PathNotFoundError:
         if source.on_missing == "skip":
             return []
@@ -309,18 +316,24 @@ def _no_transforms(path: str, source: FileSourceSpec) -> bool:
         return source.transforms.is_empty()
     if not _read_infer(source.transforms, source.infer):
         return True
-    pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
+    try:
+        pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
+    except ValueError:
+        # Inference failed (e.g. missing GPG). Defer to the byte path, whose facade
+        # applies the location policy before any inference, so denied locations
+        # surface as redacted LocationNotAllowed and allowed ones raise the real error.
+        return False
     return pipeline is None or pipeline.is_empty()
 
 
-def _with_access(mode, run, path, storage_profile, auth_profile, source):
+def _with_access(mode, run, path, storage_profile, auth_profile, policy, source):
     """Hand *run* a transport handle in *mode* ('random'/'sequential') when no transforms apply.
 
     Whole-object bytes otherwise, and when the backend refuses the mode. The handle is
     closed when *run* returns or raises.
     """
     if mode != "bytes" and _no_transforms(path, source):
-        facade = _make_facade(path, storage_profile, auth_profile)
+        facade = _make_facade(path, storage_profile, auth_profile, policy)
         try:
             handle = facade.read_stream(
                 path, pipeline=source.transforms,
@@ -334,7 +347,7 @@ def _with_access(mode, run, path, storage_profile, auth_profile, source):
             with handle:
                 return run(handle)
     data = _read_bytes(
-        path, storage_profile, auth_profile, source.transforms,
+        path, storage_profile, auth_profile, policy, source.transforms,
         infer=source.infer, gpg=source.gpg, gzip=source.gzip,
     )
     return run(data)
@@ -365,10 +378,10 @@ def inspect_schema(
         def on_bytes(data: bytes) -> SchemaResult:
             return wrap(inspector(data, spec, infer_schema_rows=n))
 
-        def on_source(path, storage_profile, auth_profile, src) -> SchemaResult:
+        def on_source(path, storage_profile, auth_profile, policy, src) -> SchemaResult:
             mode = get_schema_access(format_key, spec, n)
             run = lambda data: inspector(data, spec, infer_schema_rows=n)  # noqa: E731
-            return wrap(_with_access(mode, run, path, storage_profile, auth_profile, src))
+            return wrap(_with_access(mode, run, path, storage_profile, auth_profile, policy, src))
 
         return on_bytes, on_source
 
@@ -439,7 +452,7 @@ def write(
     if params:
         path = path.format(**params)
 
-    storage_profile, auth_profile = _resolve_profiles(sink)
+    storage_profile, auth_profile, policy = _resolve_profiles(sink)
 
     if sink.write_disposition not in ("replace", "append"):
         raise WriteError(f"Unknown write disposition: {sink.write_disposition!r}")
@@ -451,7 +464,7 @@ def write(
     # Raw bytes bypass format handling
     if isinstance(data, bytes):
         _write_bytes(
-            path, data, storage_profile, auth_profile, sink.create_path, sink.transforms
+            path, data, storage_profile, auth_profile, policy, sink.create_path, sink.transforms
         )
         return
 
@@ -484,7 +497,7 @@ def write(
         incoming = _append_table(data)
         try:
             raw = _read_bytes(
-                path, storage_profile, auth_profile, sink.transforms, infer=False
+                path, storage_profile, auth_profile, policy, sink.transforms, infer=False
             )
         except PathNotFoundError:
             data = incoming
@@ -507,6 +520,7 @@ def write(
         serialised,
         storage_profile,
         auth_profile,
+        policy,
         sink.create_path,
         sink.transforms,
     )
@@ -529,12 +543,12 @@ def copy(
         src_path = src_path.format(**params)
         dst_path = dst_path.format(**params)
 
-    src_profile, src_auth = _resolve_profiles(source)
-    dst_profile, dst_auth = _resolve_profiles(sink)
+    src_profile, src_auth, src_policy = _resolve_profiles(source)
+    dst_profile, dst_auth, dst_policy = _resolve_profiles(sink)
 
     try:
         data = _read_bytes(
-            src_path, src_profile, src_auth, source.transforms,
+            src_path, src_profile, src_auth, src_policy, source.transforms,
             infer=source.infer, gpg=source.gpg, gzip=source.gzip,
         )
     except PathNotFoundError:
@@ -543,7 +557,7 @@ def copy(
         raise
 
     _write_bytes(
-        dst_path, data, dst_profile, dst_auth, sink.create_path, sink.transforms
+        dst_path, data, dst_profile, dst_auth, dst_policy, sink.create_path, sink.transforms
     )
 
 
@@ -567,10 +581,10 @@ def stream(
     if params:
         path = path.format(**params)
 
-    storage_profile, auth_profile = _resolve_profiles(source)
+    storage_profile, auth_profile, policy = _resolve_profiles(source)
 
     try:
-        facade = _make_facade(path, storage_profile, auth_profile)
+        facade = _make_facade(path, storage_profile, auth_profile, policy)
         handle = facade.read_stream(
             path, pipeline=source.transforms,
             infer=_read_infer(source.transforms, source.infer),

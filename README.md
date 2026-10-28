@@ -115,6 +115,30 @@ Named profiles and explicit secret-store selection are covered in
 [profiles and migration](docs/profiles.md). Available operations depend on the
 transport backend; having a profile or an extra does not implement a backend.
 
+## Location policy
+
+By default a spec reads and writes wherever its `path` points: there is **no
+confinement without a policy**. When specs (or their paths, templates or
+`params`) come from untrusted input, set a `LocationPolicy` on the spec. Every
+operation (`parse`, `inspect_schema`, `stream`, `write`, `copy`, globs) passes it
+to transport, which raises `LocationNotAllowed` for anything outside it. `copy`
+applies the source spec's policy to the source and the sink spec's policy to the
+destination.
+
+```python
+from mountainash_files import FileSourceSpec
+from mountainash_transport.location import LocationPolicy
+
+# Relative paths resolve under root; escapes (.., symlinks) are rejected.
+spec = FileSourceSpec(path="a.csv", policy=LocationPolicy(root="/srv/data"))
+
+# Remote locations need an explicit scheme -> allowed hosts/buckets mapping.
+spec = FileSourceSpec(
+    path="s3://reports/a.csv",
+    policy=LocationPolicy(allowed_remote={"s3": frozenset({"reports"})}),
+)
+```
+
 ## Untrusted file contents
 
 **Archives.** Zip and gzip extraction is bounded. `ZipArchive` and
