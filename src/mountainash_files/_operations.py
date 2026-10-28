@@ -316,7 +316,13 @@ def _no_transforms(path: str, source: FileSourceSpec) -> bool:
         return source.transforms.is_empty()
     if not _read_infer(source.transforms, source.infer):
         return True
-    pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
+    try:
+        pipeline, _ = infer_pipeline(path, gpg=source.gpg, gzip=source.gzip)
+    except ValueError:
+        # Inference failed (e.g. missing GPG). Defer to the byte path, whose facade
+        # applies the location policy before any inference, so denied locations
+        # surface as redacted LocationNotAllowed and allowed ones raise the real error.
+        return False
     return pipeline is None or pipeline.is_empty()
 
 

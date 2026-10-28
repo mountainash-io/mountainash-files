@@ -106,3 +106,14 @@ def test_supplied_profile_permits_its_own_endpoint_only(env, monkeypatch):
     with pytest.raises(LocationNotAllowed):
         parse(FileSourceSpec(path="s3://bucket-b/a.csv", format="csv", storage_profile=profile, policy=pol))
     assert reads == ["s3://bucket-a/a.csv"]
+
+
+@pytest.mark.parametrize("op", ["parse", "inspect_schema", "stream"])
+def test_denied_credential_gpg_url_redacted_before_inference(op):
+    spec = FileSourceSpec(path="https://user:secret@denied.example/data.parquet.gpg", format="parquet",
+                          policy=LocationPolicy())
+    with pytest.raises(LocationNotAllowed) as e:
+        r = {"parse": parse, "inspect_schema": inspect_schema, "stream": stream}[op](spec)
+        if op == "stream":
+            r.__enter__()
+    assert "secret" not in str(e.value)
