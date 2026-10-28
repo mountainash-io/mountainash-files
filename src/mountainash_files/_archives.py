@@ -138,7 +138,18 @@ def _declared_entries(data: bytes) -> int | None:
         end = _ZIP64_LOCATOR.unpack_from(data, loc)[2]
         if end + _ZIP64_END_RECORD.size > len(data) or data[end : end + 4] != _ZIP64_END_RECORD_SIGNATURE:
             raise ArchiveExtractionError("zip: zip64 end record is malformed")
+        classic = (disk, cd_disk, on_disk, total, size, offset)
         _, _, _, _, disk, cd_disk, on_disk, total, size, offset = _ZIP64_END_RECORD.unpack_from(data, end)
+        # a reader may take each field from either record: a classic field that is not the
+        # sentinel must say what the zip64 record says
+        for shown, real, sentinel_value in zip(
+            classic,
+            (disk, cd_disk, on_disk, total, size, offset),
+            (0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFFFFFF, 0xFFFFFFFF),
+            strict=True,
+        ):
+            if shown not in (real, sentinel_value):
+                raise ArchiveExtractionError("zip: zip64 and classic end records disagree")
     if disk or cd_disk or on_disk != total:
         raise ArchiveExtractionError("zip: multi-disk archives are not supported")
     if offset + size != end:

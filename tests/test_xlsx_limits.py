@@ -341,6 +341,18 @@ class TestAmbiguousDirectory:
         with pytest.raises(ParseError, match="zip64"):
             xlsx_parse(bytes(shifted), XlsxSpec())
 
+    def test_half_sentinel_end_records_must_agree(self):
+        data = book_with_member_count(70_000)  # zip64 end record
+        pos = data.rindex(b"PK\x05\x06")
+        assert struct.unpack_from("<H", data, pos + 10)[0] == 0xFFFF  # sentinel: zip64 in force
+        # a classic field that is not the sentinel but differs from the zip64 record
+        forged = bytearray(data)
+        zip64_at = data.rindex(b"PK\x06\x06")
+        real_total = struct.unpack_from("<Q", data, zip64_at + 32)[0]
+        struct.pack_into("<H", forged, pos + 10, (real_total + 1) & 0xFFFE)
+        with pytest.raises(ParseError, match="disagree"):
+            xlsx_parse(bytes(forged), XlsxSpec(max_members=100_000))
+
     def test_decoy_zip64_record_in_directory_refused(self):
         buf = io.BytesIO(_book())
         info = zipfile.ZipInfo("xl/decoy.bin")
