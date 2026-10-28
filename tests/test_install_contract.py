@@ -39,8 +39,8 @@ def test_transport_dependency_and_forwarded_extras_share_candidate_range():
         assert len(active) == 1
         req = active[0]
         assert req.marker is None or req.marker.evaluate({"extra": extra})
-        assert "0.1.0" in req.specifier
-        assert "0.0.9" not in req.specifier
+        assert "0.1.1" in req.specifier
+        assert "0.1.0" not in req.specifier  # 0.1.1 carries LocationPolicy (backlog 381)
         assert "0.2.0" not in req.specifier
         assert "26.7.0" not in req.specifier
     assert all(canonicalize_name(req.name) != "mountainash-secrets" for req in requirements)
