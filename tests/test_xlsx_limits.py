@@ -268,6 +268,92 @@ class TestUnchangedBehaviour:
             xlsx_parse(buf.getvalue(), XlsxSpec())
 
 
+class TestAmbiguousDirectory:
+    """Containers whose directory different readers could walk differently are refused.
+
+    zipfile walks the central directory by declared byte size; other readers may walk it by
+    declared entry count or pick another end record. Anything that could let a member hide
+    from the check is a ParseError, never read by an engine.
+    """
+
+    @staticmethod
+    def _end(raw: bytes) -> int:
+        return raw.rindex(b"PK\x05\x06")
+
+    def test_declared_count_below_real_count_refused(self):
+        raw = bytearray(book_with_member_count(3))
+        pos = self._end(bytes(raw))
+        total = struct.unpack_from("<H", raw, pos + 10)[0]
+        struct.pack_into("<HH", raw, pos + 8, total - 1, total - 1)
+        with pytest.raises(ParseError, match="declares"):
+            xlsx_parse(bytes(raw), XlsxSpec())
+
+    def test_declared_count_above_real_count_refused(self):
+        raw = bytearray(book_with_member_count(3))
+        pos = self._end(bytes(raw))
+        total = struct.unpack_from("<H", raw, pos + 10)[0]
+        struct.pack_into("<HH", raw, pos + 8, total + 1, total + 1)
+        with pytest.raises(ParseError, match="declares"):
+            xlsx_parse(bytes(raw), XlsxSpec())
+
+    def test_declared_count_over_limit_rejected_before_directory_is_parsed(self):
+        raw = bytearray(_book())
+        pos = self._end(bytes(raw))
+        struct.pack_into("<HH", raw, pos + 8, 60000, 60000)
+        with pytest.raises(ArchiveLimitError, match="max_members"):
+            xlsx_parse(bytes(raw), XlsxSpec())
+
+    def test_prepended_data_refused(self):
+        with pytest.raises(ParseError, match="central directory"):
+            xlsx_parse(b"junk" * 10 + _book(), XlsxSpec())
+
+    def test_data_after_end_record_refused(self):
+        with pytest.raises(ParseError, match="after the end record"):
+            xlsx_parse(_book() + b"trailing", XlsxSpec())
+
+    def test_second_end_record_signature_in_directory_refused(self):
+        buf = io.BytesIO(_book())
+        info = zipfile.ZipInfo("xl/decoy.bin")
+        info.comment = b"PK\x05\x06" + b"\0" * 18
+        with zipfile.ZipFile(buf, "a") as zf:
+            zf.writestr(info, b"")
+        with pytest.raises(ParseError, match="more than one end record"):
+            xlsx_parse(buf.getvalue(), XlsxSpec())
+
+    def test_truncated_trailing_end_record_signature_refused(self):
+        # the last signature is not a whole record; a reader that skips it would use another
+        with pytest.raises(ParseError, match="truncated end record"):
+            xlsx_parse(_book() + b"PK\x05\x06 tail", XlsxSpec())
+
+    def test_ordinary_zip_comment_allowed(self):
+        buf = io.BytesIO(_book())
+        with zipfile.ZipFile(buf, "a") as zf:
+            zf.comment = b"made by a spreadsheet tool"
+        assert xlsx_parse(buf.getvalue(), XlsxSpec()).num_rows == 2
+
+    def test_zip64_directory_checked_and_read(self):
+        data = book_with_member_count(70_000)  # more than 65,535 entries: zip64 end record
+        assert b"PK\x06\x06" in data
+        assert xlsx_parse(data, XlsxSpec(max_members=100_000)).num_rows == 2
+        with pytest.raises(ArchiveLimitError, match="max_members"):
+            xlsx_parse(data, XlsxSpec(max_members=60_000))
+
+    def test_encrypted_member_refused(self):
+        raw = bytearray(_book())
+        central = raw.index(b"PK\x01\x02")
+        flags = struct.unpack_from("<H", raw, central + 8)[0]
+        struct.pack_into("<H", raw, central + 8, flags | 0x1)
+        with pytest.raises(ParseError, match="encrypted"):
+            xlsx_parse(bytes(raw), XlsxSpec())
+
+    def test_negative_local_header_offset_is_parse_error(self):
+        raw = bytearray(_book())
+        central = raw.index(b"PK\x01\x02")
+        struct.pack_into("<I", raw, central + 42, 0xFFFFFF00)
+        with pytest.raises(ParseError):
+            xlsx_parse(bytes(raw), XlsxSpec())
+
+
 def _swallow(run, data, spec, tmp):
     """Call an entry point, expecting the limit error (so the peak covers the rejection)."""
     with pytest.raises(ArchiveLimitError):

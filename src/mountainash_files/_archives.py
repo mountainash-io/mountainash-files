@@ -99,6 +99,50 @@ def _inflating_reader(raw: memoryview, info: zipfile.ZipInfo, start: int) -> Cal
     return read_deflated
 
 
+_END_RECORD = struct.Struct("<4s4H2LH")
+_END_RECORD_SIGNATURE = b"PK\x05\x06"
+_ZIP64_LOCATOR = struct.Struct("<4sLQL")
+_ZIP64_LOCATOR_SIGNATURE = b"PK\x06\x07"
+_ZIP64_END_RECORD = struct.Struct("<4sQ2H2L4Q")
+_ZIP64_END_RECORD_SIGNATURE = b"PK\x06\x06"
+_END_SEARCH = 0xFFFF + _END_RECORD.size  # an end record's comment is at most 64 KiB
+
+
+def _declared_entries(data: bytes) -> int | None:
+    """Entry count the container declares, after requiring one unambiguous directory.
+
+    Returns None if *data* has no end record signature at all. Python's zipfile walks the central
+    directory by its declared byte size, while other readers (calamine's zip crate) may walk
+    it by the declared entry count, and may pick another end record if the data holds more
+    than one. A container where those could disagree would let members hide from this check,
+    so anything but a plain, single, exactly-sized directory is refused.
+    """
+    pos = data.rfind(_END_RECORD_SIGNATURE, max(0, len(data) - _END_SEARCH))
+    if pos < 0:
+        return None
+    if pos + _END_RECORD.size > len(data):
+        raise ArchiveExtractionError("zip: truncated end record")
+    _, disk, cd_disk, on_disk, total, size, offset, comment = _END_RECORD.unpack_from(data, pos)
+    if pos + _END_RECORD.size + comment != len(data):
+        raise ArchiveExtractionError("zip: data after the end record")
+    end = pos
+    if total == 0xFFFF or 0xFFFFFFFF in (size, offset):
+        loc = pos - _ZIP64_LOCATOR.size
+        if loc < 0 or data[loc : loc + 4] != _ZIP64_LOCATOR_SIGNATURE:
+            raise ArchiveExtractionError("zip: zip64 end record is missing")
+        end = _ZIP64_LOCATOR.unpack_from(data, loc)[2]
+        if end + _ZIP64_END_RECORD.size > len(data) or data[end : end + 4] != _ZIP64_END_RECORD_SIGNATURE:
+            raise ArchiveExtractionError("zip: zip64 end record is malformed")
+        _, _, _, _, disk, cd_disk, on_disk, total, size, offset = _ZIP64_END_RECORD.unpack_from(data, end)
+    if disk or cd_disk or on_disk != total:
+        raise ArchiveExtractionError("zip: multi-disk archives are not supported")
+    if offset + size != end:
+        raise ArchiveExtractionError("zip: central directory does not end at the end record")
+    if data.count(_END_RECORD_SIGNATURE, offset) != 1:
+        raise ArchiveExtractionError("zip: more than one end record")
+    return total
+
+
 def check_zip_container(
     data: bytes,
     *,
@@ -109,26 +153,33 @@ def check_zip_container(
 ) -> bool:
     """Bound a zip container before a third-party reader sees it.
 
-    Returns False without checking anything if *data* is not a zip container (the caller's
+    Returns False without checking anything if *data* has no zip end record (the caller's
     reader then fails as it always did). Otherwise counts every directory entry against
     *max_members*, then inflates every member in chunks, discarding the output, against a
     single running *max_decompressed_bytes* budget. Raises ``ArchiveLimitError`` over either
-    limit (its message names *size_hint* / *members_hint*, the setting to raise) and ``ArchiveExtractionError`` if the container is malformed or uses a compression
-    method other than stored/deflate, because a member this check cannot bound is refused.
+    limit (its message names *size_hint* / *members_hint*, the setting to raise) and
+    ``ArchiveExtractionError`` if the container is malformed, has an ambiguous directory
+    (see ``_declared_entries``), or holds a member this check cannot bound: encrypted, or
+    compressed with a method other than stored/deflate.
     """
-    view = memoryview(data)
-    if not zipfile.is_zipfile(io.BytesIO(data)):
+    declared = _declared_entries(data)
+    if declared is None:
         return False
+    if declared > max_members:
+        raise ArchiveLimitError(
+            f"zip: {declared} members exceeds max_members={max_members}; "
+            f"raise {members_hint} if trusted"
+        )
+    view = memoryview(data)
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except Exception as exc:
         raise ArchiveExtractionError(f"Invalid ZIP file: {exc}") from exc
     with zf:
         infos = zf.infolist()
-        if len(infos) > max_members:
-            raise ArchiveLimitError(
-                f"zip: {len(infos)} members exceeds max_members={max_members}; "
-                f"raise {members_hint} if trusted"
+        if len(infos) != declared:
+            raise ArchiveExtractionError(
+                f"zip: central directory holds {len(infos)} entries but declares {declared}"
             )
         budget = _Budget(max_decompressed_bytes, size_hint)
         for info in infos:
@@ -139,7 +190,7 @@ def check_zip_container(
                 raise ArchiveExtractionError(
                     f"{label}: unsupported compression method {info.compress_type}"
                 )
-            if info.header_offset + _LOCAL_HEADER.size > len(view):
+            if not 0 <= info.header_offset <= len(view) - _LOCAL_HEADER.size:
                 raise ArchiveExtractionError(f"{label}: bad local file header")
             header = _LOCAL_HEADER.unpack_from(view, info.header_offset)
             if header[0] != _LOCAL_HEADER_SIGNATURE:
