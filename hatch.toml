@@ -61,7 +61,7 @@ dependencies = [
     "pytest-clarity>=1.0.1",
     "openpyxl>=3.1",
     "fastexcel>=0.21,<0.22",
-    "lxml>=4.9",
+    "lxml>=6.1.0",
 
     "mountainash_settings @    {root:uri}/temp/mountainash-settings",
     "mountainash_auth_client @ {root:uri}/temp/mountainash-auth-client",
@@ -87,7 +87,7 @@ dependencies = [
     "pytest-clarity>=1.0.1",
     "openpyxl>=3.1",
     "fastexcel>=0.21,<0.22",
-    "lxml>=4.9",
+    "lxml>=6.1.0",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
     "mountainash_transport @   {root:uri}/../mountainash-transport",
