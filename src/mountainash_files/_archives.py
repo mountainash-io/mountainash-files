@@ -105,19 +105,22 @@ _ZIP64_LOCATOR = struct.Struct("<4sLQL")
 _ZIP64_LOCATOR_SIGNATURE = b"PK\x06\x07"
 _ZIP64_END_RECORD = struct.Struct("<4sQ2H2L4Q")
 _ZIP64_END_RECORD_SIGNATURE = b"PK\x06\x06"
-_END_SEARCH = 0xFFFF + _END_RECORD.size  # an end record's comment is at most 64 KiB
 
 
 def _declared_entries(data: bytes) -> int | None:
     """Entry count the container declares, after requiring one unambiguous directory.
 
-    Returns None if *data* has no end record signature at all. Python's zipfile walks the central
-    directory by its declared byte size, while other readers (calamine's zip crate) may walk
-    it by the declared entry count, and may pick another end record if the data holds more
-    than one. A container where those could disagree would let members hide from this check,
-    so anything but a plain, single, exactly-sized directory is refused.
+    Returns None only if *data* holds no end record signature anywhere, which no zip reader
+    can open. Python's zipfile walks the central directory by its declared byte size and
+    looks for the zip64 locator whenever one is present, while other readers (calamine's zip
+    crate) may walk it by the declared entry count, read the zip64 record only when the
+    classic fields are sentinels, search the whole input for the end record, or pick another
+    end record if the data holds more than one. A container where those could disagree would
+    let members hide from this check, so anything but a plain, single, exactly-sized
+    directory with a signature-consistent end is refused. The search spans the whole input
+    (a signature outside zipfile's 64 KiB window is refused, not skipped).
     """
-    pos = data.rfind(_END_RECORD_SIGNATURE, max(0, len(data) - _END_SEARCH))
+    pos = data.rfind(_END_RECORD_SIGNATURE)
     if pos < 0:
         return None
     if pos + _END_RECORD.size > len(data):
@@ -126,10 +129,12 @@ def _declared_entries(data: bytes) -> int | None:
     if pos + _END_RECORD.size + comment != len(data):
         raise ArchiveExtractionError("zip: data after the end record")
     end = pos
-    if total == 0xFFFF or 0xFFFFFFFF in (size, offset):
-        loc = pos - _ZIP64_LOCATOR.size
-        if loc < 0 or data[loc : loc + 4] != _ZIP64_LOCATOR_SIGNATURE:
-            raise ArchiveExtractionError("zip: zip64 end record is missing")
+    loc = pos - _ZIP64_LOCATOR.size
+    has_locator = loc >= 0 and data[loc : loc + 4] == _ZIP64_LOCATOR_SIGNATURE
+    sentinel = total == 0xFFFF or 0xFFFFFFFF in (size, offset)
+    if has_locator != sentinel:
+        raise ArchiveExtractionError("zip: zip64 locator and end record fields disagree")
+    if sentinel:
         end = _ZIP64_LOCATOR.unpack_from(data, loc)[2]
         if end + _ZIP64_END_RECORD.size > len(data) or data[end : end + 4] != _ZIP64_END_RECORD_SIGNATURE:
             raise ArchiveExtractionError("zip: zip64 end record is malformed")
@@ -138,8 +143,14 @@ def _declared_entries(data: bytes) -> int | None:
         raise ArchiveExtractionError("zip: multi-disk archives are not supported")
     if offset + size != end:
         raise ArchiveExtractionError("zip: central directory does not end at the end record")
-    if data.count(_END_RECORD_SIGNATURE, offset) != 1:
-        raise ArchiveExtractionError("zip: more than one end record")
+    zip64 = 1 if sentinel else 0
+    for signature, expected in (
+        (_END_RECORD_SIGNATURE, 1),
+        (_ZIP64_END_RECORD_SIGNATURE, zip64),
+        (_ZIP64_LOCATOR_SIGNATURE, zip64),
+    ):
+        if data.count(signature, offset) != expected:
+            raise ArchiveExtractionError("zip: more than one end record")
     return total
 
 

@@ -325,6 +325,32 @@ class TestAmbiguousDirectory:
         with pytest.raises(ParseError, match="truncated end record"):
             xlsx_parse(_book() + b"PK\x05\x06 tail", XlsxSpec())
 
+    def test_end_record_outside_the_64k_search_window_refused(self):
+        # zipfile would not find it; a reader that searches the whole input might
+        data = book_with_padding(2 * MIB) + b"\0" * (0xFFFF + 64)
+        with pytest.raises(ParseError):
+            xlsx_parse(data, XlsxSpec())
+
+    def test_zip64_locator_without_sentinel_fields_refused(self):
+        # zipfile follows a zip64 locator whenever one is present; other readers only when
+        # the classic fields are sentinels, so they could read different directories
+        raw = _book()
+        pos = raw.rindex(b"PK\x05\x06")
+        locator = struct.pack("<4sLQL", b"PK\x06\x07", 0, pos, 1)
+        shifted = bytearray(raw[:pos] + locator + raw[pos:])
+        with pytest.raises(ParseError, match="zip64"):
+            xlsx_parse(bytes(shifted), XlsxSpec())
+
+    def test_decoy_zip64_record_in_directory_refused(self):
+        buf = io.BytesIO(_book())
+        info = zipfile.ZipInfo("xl/decoy.bin")
+        info.comment = b"PK\x06\x06" + b"\0" * 52
+        with zipfile.ZipFile(buf, "a") as zf:
+            zf.writestr(info, b"")
+        data = buf.getvalue()  # a plain (non-zip64) directory must hold no zip64 signature
+        with pytest.raises(ParseError, match="more than one end record"):
+            xlsx_parse(data, XlsxSpec())
+
     def test_ordinary_zip_comment_allowed(self):
         buf = io.BytesIO(_book())
         with zipfile.ZipFile(buf, "a") as zf:

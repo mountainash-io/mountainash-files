@@ -139,9 +139,12 @@ raise. The defaults sit well above real workbooks: measured with xlsxwriter, a
 members, while a zip bomb expands about 1000x. Raise the limits for trusted
 workbooks, for example `XlsxSpec(max_decompressed_bytes=2 * 1024**3)`. The check
 adds one inflate pass over the file before parsing. Members compressed with
-anything other than stored or deflate, encrypted members and a damaged zip
-directory are refused with `ParseError`; input that is not a zip container is
-left to the engine, which rejects it as before. The limit bounds one pass over
+anything other than stored or deflate, encrypted members, a damaged zip
+directory, and containers whose directory is ambiguous (prepended or trailing
+data, an entry count that disagrees with the directory, a stray end-record
+signature) are refused with `ParseError`, because different zip readers could
+walk such a directory differently; input with no zip end record is left to the
+engine, which rejects it as before. The limit bounds one pass over
 the container; an engine may read a member more than once.
 
 **XML external entities.** XML parsing with the `[xml]` extra requires
