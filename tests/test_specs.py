@@ -90,7 +90,7 @@ class TestProfileFields:
 
         profile = LocalStorageProfile()
         spec = FileSourceSpec(path="/tmp/x.csv", storage_profile=profile)
-        resolved_profile, resolved_auth = _resolve_profiles(spec)
+        resolved_profile, resolved_auth, _ = _resolve_profiles(spec)
         assert resolved_profile is profile
         assert resolved_auth is None
 
@@ -109,7 +109,7 @@ class TestProfileFields:
         )
         monkeypatch.setenv("MOUNTAINASH_PROFILES_CONFIG", str(cfg))
         spec = FileSourceSpec(path="/tmp/x.csv", storage_profile="scratch")
-        resolved_profile, resolved_auth = _resolve_profiles(spec)
+        resolved_profile, resolved_auth, _ = _resolve_profiles(spec)
         assert isinstance(resolved_profile, LocalStorageProfile)
         assert isinstance(resolved_auth, NoAuthProfile)
 
@@ -128,5 +128,5 @@ class TestProfileFields:
         spec = FileSourceSpec(
             path="https://example.com/x.csv", storage_profile="web", auth_profile=token
         )
-        _, resolved_auth = _resolve_profiles(spec)
+        _, resolved_auth, _ = _resolve_profiles(spec)
         assert resolved_auth is token

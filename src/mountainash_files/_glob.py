@@ -8,6 +8,7 @@ from mountainash_transport import StorageFacade
 if t.TYPE_CHECKING:
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import StorageProfileProtocol
+    from mountainash_transport.location import LocationPolicy
 
 
 def resolve_glob(
@@ -16,6 +17,7 @@ def resolve_glob(
     *,
     storage_profile: "StorageProfileProtocol | None" = None,
     auth_profile: "AuthProfile | None" = None,
+    policy: "LocationPolicy | None" = None,
 ) -> list[str]:
     """Sorted paths of the files beneath *base_path* whose relative path matches *pattern*.
 
@@ -25,7 +27,7 @@ def resolve_glob(
     """
     parts = [p for p in pattern.split("/") if p not in ("", ".")]
     base = base_path if base_path.endswith("/") else base_path + "/"
-    facade = StorageFacade.from_path(base, storage_profile, auth_profile=auth_profile)
+    facade = StorageFacade.from_path(base, storage_profile, auth_profile=auth_profile, policy=policy)
     level = facade.list_objects(base, delimiter="/")
     if len(parts) == 1 and parts[0] != "**":
         return sorted(e.path for e in level.objects if e.name and fnmatchcase(e.name, parts[0]))

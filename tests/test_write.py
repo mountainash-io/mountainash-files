@@ -424,7 +424,7 @@ def test_append_forwards_remote_profile_and_auth(tmp_path, monkeypatch):
             operations.append("write")
             return local.write(str(target), data, **kwargs)
 
-    def route_factory(path, storage_profile=None, *, auth_profile=None):
+    def route_factory(path, storage_profile=None, *, auth_profile=None, policy=None):
         assert path == route
         seen.append((storage_profile, auth_profile))
         return RoutedFacade()
