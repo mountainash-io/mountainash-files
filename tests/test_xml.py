@@ -53,3 +53,30 @@ class TestXmlParse:
         data = io.BytesIO(b"<root/>")
         element = xml_parse(data, XmlSpec())
         assert element.tag == "root"
+
+
+class TestXmlExternalEntities:
+    """CVE-2026-41066: lxml < 6.1 resolves external entities by default; the floor is >=6.1.0."""
+
+    SENTINEL = "XXE-SENTINEL-7f3a"
+
+    def _xxe(self, path: Path) -> bytes:
+        return (
+            f'<?xml version="1.0"?><!DOCTYPE r [<!ENTITY x SYSTEM "file://{path}">]>'
+            "<r>&x;</r>"
+        ).encode()
+
+    @pytest.mark.parametrize("spec", [XmlSpec(), XmlSpec(encoding="UTF-8")])
+    def test_external_entity_does_not_read_local_files(self, tmp_path, spec):
+        secret = tmp_path / "secret.txt"
+        secret.write_text(self.SENTINEL)
+        try:
+            root = xml_parse(self._xxe(secret), spec)
+        except ParseError as exc:
+            assert self.SENTINEL not in str(exc)  # rejecting the document is safe
+            return
+        assert self.SENTINEL not in (root.text or "")
+
+    def test_internal_entities_still_expand(self):
+        data = b'<!DOCTYPE r [<!ENTITY e "hello">]><r>&e;</r>'
+        assert xml_parse(data, XmlSpec()).text == "hello"

@@ -126,6 +126,12 @@ Extraction streams with a running byte count, so if a limit is exceeded it raise
 sources you can raise the limits, for example
 `ZipArchive(max_decompressed_bytes=8 * 1024**3)`.
 
+**XML external entities.** XML parsing with the `[xml]` extra requires
+`lxml>=6.1.0`. Earlier lxml releases resolve external entities by default
+(CVE-2026-41066), which lets an untrusted document read local files. From 6.1.0
+the parser expands only entities declared inside the document and a reference
+to an external entity is a parse error.
+
 **CSV/TSV formula cells.** By default the CSV and TSV writers write cell values
 unchanged. A value starting with `=`, `+`, `-`, `@`, a tab or a carriage return may
 be evaluated as a formula when the export is opened in a spreadsheet application.
