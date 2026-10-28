@@ -126,6 +126,24 @@ Extraction streams with a running byte count, so if a limit is exceeded it raise
 sources you can raise the limits, for example
 `ZipArchive(max_decompressed_bytes=8 * 1024**3)`.
 
+**XLSX workbooks.** An `.xlsx` file is a zip container read by a third-party
+engine, so `XlsxSpec` applies the same kind of limit before any engine sees the
+bytes: `max_decompressed_bytes` (default 512 MiB, total across all members) and
+`max_members` (default 1,000). The container is inflated in chunks and the
+output discarded, so the check counts the bytes actually produced, not the sizes
+the zip directory declares (which an attacker can forge), and holds only a chunk
+in memory. Over either limit it raises `ArchiveLimitError`, naming the field to
+raise. The defaults sit well above real workbooks: measured with xlsxwriter, a
+1M-row, 3-column sheet is 144 MiB uncompressed (7.7x its file size), a
+100k-row, 23-column sheet is 97 MiB (12x), and a workbook holds about a dozen
+members, while a zip bomb expands about 1000x. Raise the limits for trusted
+workbooks, for example `XlsxSpec(max_decompressed_bytes=2 * 1024**3)`. The check
+adds one inflate pass over the file before parsing. Members compressed with
+anything other than stored or deflate, encrypted members and a damaged zip
+directory are refused with `ParseError`; input that is not a zip container is
+left to the engine, which rejects it as before. The limit bounds one pass over
+the container; an engine may read a member more than once.
+
 **XML external entities.** XML parsing with the `[xml]` extra requires
 `lxml>=6.1.0`. Earlier lxml releases resolve external entities by default
 (CVE-2026-41066), which lets an untrusted document read local files. From 6.1.0
