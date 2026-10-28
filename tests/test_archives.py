@@ -195,6 +195,19 @@ class TestDecompressionLimits:
         data = (FIXTURES / "sample.zip").read_bytes()
         assert len(list(unpack_archive(data, ZipArchive()))) == 2
 
+    @pytest.mark.parametrize(
+        ("spec", "field"),
+        [
+            (GzipCompression, "max_decompressed_bytes"),
+            (ZipArchive, "max_decompressed_bytes"),
+            (ZipArchive, "max_members"),
+        ],
+    )
+    @pytest.mark.parametrize("bad", [0, -1, True, 1.5, "10", None])
+    def test_invalid_limit_values_rejected(self, spec, field, bad):
+        with pytest.raises(ValueError, match=field):
+            spec(**{field: bad})
+
     def test_parse_surfaces_limit_error(self, tmp_path):
         path = tmp_path / "bomb.zip"
         path.write_bytes(self._zip({"a.csv": b"a\n" + b"1\n" * 1_000_000}))

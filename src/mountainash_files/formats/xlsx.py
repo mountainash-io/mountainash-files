@@ -10,6 +10,7 @@ from mountainash_files._exceptions import MissingDependencyError
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
+from mountainash_files.specs.archive import require_positive_limits
 
 
 # Measured with xlsxwriter: 1M rows x 3 cols is 144 MiB uncompressed (7.7x), 100k x 23 is
@@ -43,10 +44,7 @@ class XlsxSpec(FormatSpec):
         n = self.infer_sample_rows
         if n is not None and (isinstance(n, bool) or not isinstance(n, int) or n < 1):
             raise ValueError("infer_sample_rows must be a positive int or None")
-        for name in ("max_decompressed_bytes", "max_members"):
-            value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-                raise ValueError(f"{name} must be a positive int")
+        require_positive_limits(self, "max_decompressed_bytes", "max_members")
 
 
 def _check_container(raw: bytes, spec: XlsxSpec) -> None:
