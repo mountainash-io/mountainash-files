@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
-    "pyarrow>=16",
+    "pyarrow>=23.0.1",
     "polars>=2.0,<3",
     "mountainash-transport>=0.1.0,<0.2",
 ]
