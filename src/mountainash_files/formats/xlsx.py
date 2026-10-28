@@ -5,10 +5,17 @@ from typing import BinaryIO, ClassVar, Literal
 
 import pyarrow as pa
 
+from mountainash_files._archives import ArchiveExtractionError, ArchiveLimitError, check_zip_container
 from mountainash_files._exceptions import MissingDependencyError
 from mountainash_files.formats._exceptions import ParseError
 from mountainash_files.formats._registry import register_format
 from mountainash_files.formats._types import FormatSpec
+
+
+# Measured with xlsxwriter: 1M rows x 3 cols is 144 MiB uncompressed (7.7x), 100k x 23 is
+# 97 MiB (12x); real workbooks hold about a dozen members. A zip bomb runs near 1000x.
+DEFAULT_XLSX_MAX_DECOMPRESSED_BYTES = 512 * 1024**2  # 512 MiB
+DEFAULT_XLSX_MAX_MEMBERS = 1_000
 
 
 @dataclasses.dataclass(frozen=True)
@@ -27,6 +34,8 @@ class XlsxSpec(FormatSpec):
     comment_char: str | None = None
     temporal: Literal["infer", "text"] = "infer"
     infer_sample_rows: int | None = None
+    max_decompressed_bytes: int = DEFAULT_XLSX_MAX_DECOMPRESSED_BYTES
+    max_members: int = DEFAULT_XLSX_MAX_MEMBERS
 
     def __post_init__(self) -> None:
         if self.temporal not in ("infer", "text"):
@@ -34,6 +43,29 @@ class XlsxSpec(FormatSpec):
         n = self.infer_sample_rows
         if n is not None and (isinstance(n, bool) or not isinstance(n, int) or n < 1):
             raise ValueError("infer_sample_rows must be a positive int or None")
+        for name in ("max_decompressed_bytes", "max_members"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{name} must be a positive int")
+
+
+def _check_container(raw: bytes, spec: XlsxSpec) -> None:
+    """Bound the zip container's actual inflated size and member count before any engine runs.
+
+    Input that is not a zip container is left for the engine to reject, as before.
+    """
+    try:
+        check_zip_container(
+            raw,
+            max_decompressed_bytes=spec.max_decompressed_bytes,
+            max_members=spec.max_members,
+            size_hint="XlsxSpec.max_decompressed_bytes",
+            members_hint="XlsxSpec.max_members",
+        )
+    except ArchiveLimitError:
+        raise
+    except ArchiveExtractionError as exc:
+        raise ParseError("xlsx", str(exc)) from exc
 
 
 def _xlsx_table(data: bytes | BinaryIO, spec: XlsxSpec, limit: int | None = None) -> tuple[pa.Table, bool]:
@@ -43,6 +75,7 @@ def _xlsx_table(data: bytes | BinaryIO, spec: XlsxSpec, limit: int | None = None
     raw = data.read() if hasattr(data, "read") else data
     if not raw:
         raise ParseError("xlsx", "Empty input")
+    _check_container(raw, spec)
     try:
         import fastexcel  # noqa: F401
         import openpyxl  # noqa: F401
