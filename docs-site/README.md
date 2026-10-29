@@ -14,18 +14,22 @@ snapshots strictly on each push to either branch that touches `docs-site/`, and
 publishes them together as one Pages artifact. A failed build leaves the
 previous paired site live.
 
+Until a release brings `docs-site/` to `main`, the workflow publishes the
+`develop` snapshot alone at `/mountainash-files/dev/`, and the root redirects there.
+The first push to `main` that includes the textbook switches to the paired site.
+
 Publishing is off until it is activated:
 
-1. Merge the textbook into `develop` and then, through a release, into `main`.
-   The production build needs `docs-site/site/` on `main`.
-2. Enable GitHub Pages for the repository with GitHub Actions as the source,
-   with its `github-pages` environment and the shared custom domain used by the
-   other mountainash textbooks.
-3. Set the repository Actions variable `TEXTBOOK_PUBLISHING_ENABLED` to `true`.
-4. Manually dispatch `deploy-textbook.yml`.
+1. Enable GitHub Pages for the repository with GitHub Actions as the source.
+   Leave the custom domain blank: the organisation site `mountainash-io.github.io`
+   owns `docs.mountainash.io`, and every repository's Pages site is served under it
+   at `/<repository>/`.
+2. Set the repository Actions variable `TEXTBOOK_PUBLISHING_ENABLED` to `true`.
+3. Push a `docs-site/` change to `develop`, or, once the workflow is on `main`,
+   dispatch `deploy-textbook.yml` manually. GitHub offers manual dispatch only for
+   workflows on the default branch.
 
-Until then, publishing runs are skipped, so a one-sided bootstrap cannot deploy
-an incomplete site.
+Until the variable is set, publishing runs are skipped.
 
 ## Source artifacts
 

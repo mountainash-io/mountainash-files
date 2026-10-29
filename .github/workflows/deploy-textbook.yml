@@ -23,6 +23,7 @@ jobs:
     outputs:
       main_sha: ${{ steps.snapshots.outputs.main_sha }}
       develop_sha: ${{ steps.snapshots.outputs.develop_sha }}
+      main_has_textbook: ${{ steps.snapshots.outputs.main_has_textbook }}
     steps:
       - name: Check out production branch snapshot
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -46,6 +47,13 @@ jobs:
           develop_sha=$(git -C dev rev-parse --verify HEAD)
           [[ "$main_sha" =~ ^[0-9a-f]{40}$ && "$develop_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'main_sha=%s\ndevelop_sha=%s\n' "$main_sha" "$develop_sha" >> "$GITHUB_OUTPUT"
+          # Until a release brings the textbook to main, publish the develop snapshot alone.
+          if [[ -f prod/docs-site/site/mkdocs.yml ]]; then
+            echo 'main_has_textbook=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'main_has_textbook=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::main has no textbook yet; publishing the develop snapshot only, under dev/.'
+          fi
           {
             printf '## Selected textbook snapshots\n\n'
             printf -- '- Production (`main`): `%s`\n' "$main_sha"
@@ -58,6 +66,7 @@ jobs:
           python-version: "3.12"
 
       - name: Build production textbook
+        if: steps.snapshots.outputs.main_has_textbook == 'true'
         working-directory: prod/docs-site/site
         env:
           TEXTBOOK_SITE_URL: https://docs.mountainash.io/mountainash-files/
@@ -80,14 +89,24 @@ jobs:
           "$RUNNER_TEMP/dev-venv/bin/python" -m mkdocs build --strict --config-file mkdocs.yml --site-dir "$RUNNER_TEMP/dev-output"
 
       - name: Assemble paired Pages artifact
+        env:
+          MAIN_HAS_TEXTBOOK: ${{ steps.snapshots.outputs.main_has_textbook }}
         shell: bash
         run: |
-          if [[ -e "$RUNNER_TEMP/prod-output/dev" || -L "$RUNNER_TEMP/prod-output/dev" ]]; then
-            echo "::error::Production output occupies the reserved dev/ path."
-            exit 1
-          fi
           mkdir "$RUNNER_TEMP/pages-artifact"
-          cp -a "$RUNNER_TEMP/prod-output/." "$RUNNER_TEMP/pages-artifact/"
+          if [[ "$MAIN_HAS_TEXTBOOK" == 'true' ]]; then
+            if [[ -e "$RUNNER_TEMP/prod-output/dev" || -L "$RUNNER_TEMP/prod-output/dev" ]]; then
+              echo "::error::Production output occupies the reserved dev/ path."
+              exit 1
+            fi
+            cp -a "$RUNNER_TEMP/prod-output/." "$RUNNER_TEMP/pages-artifact/"
+          else
+            # No production textbook yet: the root redirects to the development snapshot.
+            printf '%s\n' '<!doctype html><meta charset="utf-8"><title>mountainash-files</title>' \
+              '<meta http-equiv="refresh" content="0; url=dev/">' \
+              '<link rel="canonical" href="dev/"><a href="dev/">mountainash-files development documentation</a>' \
+              > "$RUNNER_TEMP/pages-artifact/index.html"
+          fi
           mkdir "$RUNNER_TEMP/pages-artifact/dev"
           cp -a "$RUNNER_TEMP/dev-output/." "$RUNNER_TEMP/pages-artifact/dev/"
 
@@ -123,6 +142,8 @@ jobs:
           textbook_inputs() {
             local revision="$1" site workflow
             site=$(gh api "repos/$GITHUB_REPOSITORY/git/trees/$revision" --jq '.tree[] | select(.path == "docs-site" and .type == "tree") | .sha')
+            # A branch the textbook has not reached yet (main before its first release).
+            if [[ -z "$site" ]]; then printf 'absent\n'; return 0; fi
             workflow=$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/deploy-textbook.yml?ref=$revision" --jq '.sha')
             [[ "$site" =~ ^[0-9a-f]{40}$ && "$workflow" =~ ^[0-9a-f]{40}$ ]] || return 1
             printf '%s:%s\n' "$site" "$workflow"
