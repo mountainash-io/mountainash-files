@@ -51,3 +51,58 @@ class TestCopyLocal:
         sink = FileSinkSpec(path=str(tmp_path / "copy.parquet"))
         copy(source, sink)
         assert (tmp_path / "copy.parquet").read_bytes() == (FIXTURES / "sample.parquet").read_bytes()
+
+
+class TestCopyEndpointPolicyIndependence:
+    """Each endpoint resolves its own override against its own profile."""
+
+    @pytest.fixture
+    def stores(self, tmp_path):
+        from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+        src_root, dst_root = tmp_path / "src", tmp_path / "dst"
+        src_root.mkdir(); dst_root.mkdir()
+        (src_root / "in.txt").write_bytes(b"inside")
+        (tmp_path / "outside.txt").write_bytes(b"outside")
+        src_profile = LocalStorageProfile(ROOT_PATH=str(src_root), LOCATION_POLICY={})
+        dst_profile = LocalStorageProfile(ROOT_PATH=str(dst_root), LOCATION_POLICY={})
+        return tmp_path, src_profile, dst_profile
+
+    def test_inherited_source_policy_denies_before_writing(self, stores):
+        from mountainash_transport.location import LocationNotAllowed
+
+        tmp, src_profile, dst_profile = stores
+        with pytest.raises(LocationNotAllowed):
+            copy(FileSourceSpec(path=str(tmp / "outside.txt"), storage_profile=src_profile),
+                 FileSinkSpec(path="out.txt", storage_profile=dst_profile))
+        assert not (tmp / "dst" / "out.txt").exists()
+
+    def test_source_off_does_not_disable_inherited_sink_policy(self, stores):
+        from mountainash_transport.location import LocationNotAllowed
+
+        tmp, src_profile, dst_profile = stores
+        with pytest.raises(LocationNotAllowed):
+            copy(FileSourceSpec(path=str(tmp / "outside.txt"), storage_profile=src_profile, policy=None),
+                 FileSinkSpec(path=str(tmp / "escaped.txt"), storage_profile=dst_profile))
+        assert not (tmp / "escaped.txt").exists()
+
+    def test_sink_off_does_not_disable_inherited_source_policy(self, stores):
+        from mountainash_transport.location import LocationNotAllowed
+
+        tmp, src_profile, dst_profile = stores
+        with pytest.raises(LocationNotAllowed):
+            copy(FileSourceSpec(path=str(tmp / "outside.txt"), storage_profile=src_profile),
+                 FileSinkSpec(path=str(tmp / "escaped.txt"), storage_profile=dst_profile, policy=None))
+        assert not (tmp / "escaped.txt").exists()
+
+    def test_each_endpoint_off_independently(self, stores):
+        tmp, src_profile, dst_profile = stores
+        copy(FileSourceSpec(path=str(tmp / "outside.txt"), storage_profile=src_profile, policy=None),
+             FileSinkSpec(path=str(tmp / "escaped.txt"), storage_profile=dst_profile, policy=None))
+        assert (tmp / "escaped.txt").read_bytes() == b"outside"
+
+    def test_inherited_endpoints_allow_their_own_roots(self, stores):
+        tmp, src_profile, dst_profile = stores
+        copy(FileSourceSpec(path="in.txt", storage_profile=src_profile),
+             FileSinkSpec(path="out.txt", storage_profile=dst_profile))
+        assert (tmp / "dst" / "out.txt").read_bytes() == b"inside"
