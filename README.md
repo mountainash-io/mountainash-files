@@ -47,7 +47,8 @@ python -m pip install -e ../mountainash-settings -e ../mountainash-auth-client \
 |---|---|
 | `[xlsx]` | fastexcel and openpyxl for Excel reads |
 | `[xml]` | lxml; basic XML uses the standard library |
-| `[s3]`, `[sftp]` | Transport dependencies for the corresponding backend |
+| `[http]` | Transport's `[http]` stack: URL sources (`https://…`) and named storage profiles |
+| `[s3]`, `[sftp]` | Transport dependencies for the corresponding backend (include `[http]`) |
 | `[encryption]` | Transport's GPG support; also requires GnuPG and keys |
 | `[gcs]`, `[azure]` | SDKs for backends still pending in transport |
 | `[all]` | All of the above |
