@@ -27,26 +27,24 @@ For a no-publication public-only rehearsal on any allowed branch:
 
 ```sh
 gh workflow run build-and-release-package.yml --repo mountainash-io/mountainash-files \
-  --ref develop -f verify_public=true -f release=false -f publish=false \
+  --ref develop -f verify_public=true -f publish=false \
   -f release_type=production -f fallback_branch=develop
 ```
 
-Open PRs and default manual runs are development-rehearsal-only. Merged PRs publish
-the exact verified artifacts to a GitHub release and open a `develop` PR in
-`mountainash-io/mountainash-wheels`. Merges into `develop` produce `rc` versions;
-`main` uses the reviewed source version; other supported targets produce beta
-versions. Generated suffixes are not committed.
+Open PRs and default manual runs are development-rehearsal-only. Merging a PR performs
+no release action: no tag, no GitHub release, and no wheels-repository PR. The only
+release action is a manual `main` run with `publish=true`, approved in the protected
+`pypi` environment. Generated version suffixes are not committed.
 
-Manual runs expose independent `release` (GitHub/wheels), `publish` (PyPI), and
-`verify_public` flags, all false by default, plus `release_type` (`production`,
+Manual runs expose independent `publish` (PyPI) and
+`verify_public` flags, both false by default, plus `release_type` (`production`,
 `rc`, or `beta`) and `fallback_branch` (`develop` or `main`). Publication requires
 an authorized manual `main` run with `publish=true`, `release_type=production`,
 both a successful public-only gate and protected-environment approval. It uploads
 the exact verified wheel/sdist with unchanged OIDC and hash confirmation; no
 rebuild, asset replacement, or `skip-existing` fallback is used. Post-publication
 installation accepts only `distribution==version` from public PyPI and rejects
-every local/non-public dependency source. Use `release=false` for a PyPI-only run
-when the GitHub release already exists.
+every local/non-public dependency source.
 
 See the [shared release procedures](https://github.com/mountainash-io/mountainash-central/blob/main/05.devops/releases/shared/README.md)
 for the distinction between source/wheelhouse rehearsal, public-only readiness, and
