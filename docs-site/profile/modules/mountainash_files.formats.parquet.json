@@ -1,0 +1,82 @@
+{
+  "id": "mountainash_files.formats.parquet",
+  "path": "src/mountainash_files/formats/parquet.py",
+  "summary": "Parquet format: ParquetSpec with column projection (including dotted nested leaves). Only projected reads use random access, so a remote file is not downloaded in full. Schema inspection reads only the footer. Parquet is the only format that supports append.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture",
+    "broader-hype"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "ParquetSpec"
+  ],
+  "key_classes": [
+    "ParquetSpec"
+  ],
+  "key_functions": [
+    "parquet_parse",
+    "parquet_serialise",
+    "parquet_inspect_schema",
+    "parquet_access",
+    "_project"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._engines",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types"
+  ],
+  "dependents": [
+    "mountainash_files._operations",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "APPENDABLE=True; _operations imports ParquetSpec to clear the column projection when it reads the destination for an append."
+  ],
+  "documentation_hooks": [
+    "Remote Parquet: projected reads over ranged access",
+    "Parquet append"
+  ],
+  "examples": [
+    "examples/parquet_append/example.py"
+  ],
+  "tests": [
+    "tests/test_parquet.py",
+    "tests/test_write.py",
+    "tests/test_schema_discovery.py",
+    "tests/test_serialise_formats.py"
+  ],
+  "risks": [
+    "parquet_serialise ignores the spec, so there are no writer options such as compression or row-group size."
+  ],
+  "open_questions": [
+    "Should ParquetSpec expose writer options such as compression and row-group size?"
+  ],
+  "evidence": [
+    {
+      "kind": "doc",
+      "path": "docs/migration-reader-engines.md",
+      "detail": "Remote Parquet section"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_access_routing.py",
+      "detail": "random route for projected parquet"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

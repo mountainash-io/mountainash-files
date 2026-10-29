@@ -1,0 +1,80 @@
+{
+  "id": "mountainash_files.formats.json",
+  "path": "src/mountainash_files/formats/json.py",
+  "summary": "JSON and NDJSON format: JsonSpec options (property path, item shape and keys, array header row, ndjson, temporal handling, inference sample size), a polars fast path for record arrays and NDJSON objects, stdlib decoding for everything else, a line-bounded NDJSON schema inspector and a serialiser.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "JsonSpec"
+  ],
+  "key_classes": [
+    "JsonSpec"
+  ],
+  "key_functions": [
+    "json_parse",
+    "json_serialise",
+    "json_inspect_schema",
+    "json_schema_access",
+    "_resolve_rows",
+    "_ndjson_prefix"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._engines",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types"
+  ],
+  "dependents": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "The .ndjson and .jsonl suffixes set ndjson=True through suffix_overrides.",
+    "Payloads that are not tabular (scalars, mixed shapes) come back as Python objects; the output seam rejects arrays that are not records."
+  ],
+  "documentation_hooks": [
+    "JSON shapes: documents, record arrays, array rows with header, NDJSON",
+    "Property path selection"
+  ],
+  "examples": [
+    "examples/in_memory/example.py"
+  ],
+  "tests": [
+    "tests/test_json.py",
+    "tests/test_serialise_formats.py",
+    "tests/test_schema_discovery.py",
+    "tests/test_format_spec_contract.py"
+  ],
+  "risks": [
+    "json_serialise uses default=str, which silently turns non-JSON values into strings."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/formats/json.py",
+      "detail": "JsonSpec dataclass"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/migration-reader-engines.md",
+      "detail": "JSON section"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

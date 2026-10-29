@@ -1,0 +1,2262 @@
+{
+  "metadata": {
+    "title": "mountainash-files Concept Graph",
+    "description": "Internal concept dependency graph for the mountainash-files book: file specs, operations, the format registry and built-in formats, file selection and archives, storage and transforms, schema discovery, writing, errors, extension and internals.",
+    "creator": "Nathaniel Ramm",
+    "date": "2026-10-29",
+    "version": "1.0",
+    "format": "Learning Graph JSON v1.0",
+    "schema": "https://raw.githubusercontent.com/dmccreary/learning-graphs/refs/heads/main/src/schema/learning-graph-schema.json",
+    "license": "Apache-2.0"
+  },
+  "groups": {
+    "DELIM": {
+      "classifierName": "Delimited Formats (CSV/TSV)",
+      "color": "SteelBlue",
+      "font": {
+        "color": "white"
+      }
+    },
+    "ERR": {
+      "classifierName": "Errors",
+      "color": "DarkSlateBlue",
+      "font": {
+        "color": "white"
+      }
+    },
+    "EXT": {
+      "classifierName": "Extending Formats",
+      "color": "DarkGreen",
+      "font": {
+        "color": "white"
+      }
+    },
+    "FMT": {
+      "classifierName": "Format System",
+      "color": "LimeGreen",
+      "font": {
+        "color": "black"
+      }
+    },
+    "FMTS": {
+      "classifierName": "JSON, Parquet, Excel and XML",
+      "color": "Gold",
+      "font": {
+        "color": "black"
+      }
+    },
+    "FOUND": {
+      "classifierName": "Foundations",
+      "color": "DarkGoldenrod",
+      "font": {
+        "color": "white"
+      }
+    },
+    "INT": {
+      "classifierName": "Internals",
+      "color": "Khaki",
+      "font": {
+        "color": "black"
+      }
+    },
+    "OPS": {
+      "classifierName": "Operations",
+      "color": "Teal",
+      "font": {
+        "color": "white"
+      }
+    },
+    "SCHEMA": {
+      "classifierName": "Schema Discovery",
+      "color": "DodgerBlue",
+      "font": {
+        "color": "white"
+      }
+    },
+    "SEL": {
+      "classifierName": "File Selection and Archives",
+      "color": "LightSkyBlue",
+      "font": {
+        "color": "black"
+      }
+    },
+    "SPEC": {
+      "classifierName": "File Specs",
+      "color": "Crimson",
+      "font": {
+        "color": "white"
+      }
+    },
+    "STOR": {
+      "classifierName": "Storage and Transforms",
+      "color": "DarkRed",
+      "font": {
+        "color": "white"
+      }
+    },
+    "WRITE": {
+      "classifierName": "Writing and Append",
+      "color": "MediumPurple",
+      "font": {
+        "color": "white"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": 1,
+      "label": "Structured File",
+      "group": "FOUND",
+      "shape": "box",
+      "cis": 509,
+      "modules": [],
+      "chapter": "files-specs-and-formats",
+      "section": "Structured files, Arrow tables and records"
+    },
+    {
+      "id": 2,
+      "label": "Arrow Table",
+      "group": "FOUND",
+      "shape": "box",
+      "cis": 51,
+      "modules": [],
+      "chapter": "files-specs-and-formats",
+      "section": "Structured files, Arrow tables and records"
+    },
+    {
+      "id": 3,
+      "label": "Python Records",
+      "group": "FOUND",
+      "shape": "box",
+      "cis": 19,
+      "modules": [],
+      "chapter": "files-specs-and-formats",
+      "section": "Structured files, Arrow tables and records"
+    },
+    {
+      "id": 4,
+      "label": "Tabular vs Non-Tabular Data",
+      "group": "FOUND",
+      "cis": 16,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Structured files, Arrow tables and records"
+    },
+    {
+      "id": 5,
+      "label": "Storage Location",
+      "group": "FOUND",
+      "cis": 161,
+      "modules": [
+        "mountainash_files.specs.base"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Where files live"
+    },
+    {
+      "id": 6,
+      "label": "Optional Extras",
+      "group": "FOUND",
+      "shape": "box",
+      "cis": 15,
+      "modules": [
+        "mountainash_files._exceptions"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Where files live"
+    },
+    {
+      "id": 7,
+      "label": "mountainash-transport",
+      "group": "FOUND",
+      "cis": 25,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files._glob"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Where files live"
+    },
+    {
+      "id": 8,
+      "label": "FileSpec",
+      "group": "SPEC",
+      "cis": 79,
+      "modules": [
+        "mountainash_files.specs.base"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "File specs"
+    },
+    {
+      "id": 9,
+      "label": "FileSourceSpec",
+      "group": "SPEC",
+      "cis": 44,
+      "modules": [
+        "mountainash_files.specs.source"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "File specs"
+    },
+    {
+      "id": 10,
+      "label": "FileSinkSpec",
+      "group": "SPEC",
+      "cis": 22,
+      "modules": [
+        "mountainash_files.specs.sink"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "File specs"
+    },
+    {
+      "id": 11,
+      "label": "Spec Format Field",
+      "group": "SPEC",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files._operations"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Formats and format specs"
+    },
+    {
+      "id": 12,
+      "label": "Immutable Specs",
+      "group": "SPEC",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "File specs"
+    },
+    {
+      "id": 13,
+      "label": "Format Key",
+      "group": "FMT",
+      "cis": 268,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Formats and format specs"
+    },
+    {
+      "id": 14,
+      "label": "FormatSpec",
+      "group": "FMT",
+      "cis": 103,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "Formats and format specs"
+    },
+    {
+      "id": 15,
+      "label": "Suffix Detection",
+      "group": "FMT",
+      "cis": 56,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "How a format is chosen"
+    },
+    {
+      "id": 16,
+      "label": "Media Type Detection",
+      "group": "FMT",
+      "cis": 52,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "How a format is chosen"
+    },
+    {
+      "id": 17,
+      "label": "Format Resolution Precedence",
+      "group": "FMT",
+      "cis": 51,
+      "modules": [
+        "mountainash_files.formats._registry",
+        "mountainash_files._operations"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "How a format is chosen"
+    },
+    {
+      "id": 18,
+      "label": "Transform Suffixes Skipped",
+      "group": "FMT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "files-specs-and-formats",
+      "section": "How a format is chosen"
+    },
+    {
+      "id": 19,
+      "label": "Suffix Overrides",
+      "group": "FMT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats.json"
+      ],
+      "chapter": "format-options",
+      "section": "JSON and NDJSON"
+    },
+    {
+      "id": 20,
+      "label": "Format Options Round-Trip",
+      "group": "FMT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "format-options",
+      "section": "Format specs as options"
+    },
+    {
+      "id": 21,
+      "label": "Format Capability Flags",
+      "group": "FMT",
+      "cis": 7,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "format-options",
+      "section": "Format specs as options"
+    },
+    {
+      "id": 22,
+      "label": "parse",
+      "group": "OPS",
+      "cis": 15,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Parsing a file"
+    },
+    {
+      "id": 23,
+      "label": "ParseResult",
+      "group": "OPS",
+      "cis": 17,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Parsing a file"
+    },
+    {
+      "id": 24,
+      "label": "Output Mode (arrow vs pydata)",
+      "group": "OPS",
+      "cis": 2,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Arrow or Python records"
+    },
+    {
+      "id": 25,
+      "label": "parse_bytes",
+      "group": "OPS",
+      "cis": 2,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Buffers you already hold"
+    },
+    {
+      "id": 26,
+      "label": "write",
+      "group": "OPS",
+      "cis": 14,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Writing and converting"
+    },
+    {
+      "id": 27,
+      "label": "serialise_bytes",
+      "group": "OPS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Buffers you already hold"
+    },
+    {
+      "id": 28,
+      "label": "copy",
+      "group": "OPS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Copying bytes and opening streams"
+    },
+    {
+      "id": 29,
+      "label": "stream",
+      "group": "OPS",
+      "cis": 5,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Copying bytes and opening streams"
+    },
+    {
+      "id": 30,
+      "label": "Path Templates",
+      "group": "SEL",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "selecting-files",
+      "section": "Path templates"
+    },
+    {
+      "id": 31,
+      "label": "Glob Patterns",
+      "group": "SEL",
+      "cis": 4,
+      "modules": [
+        "mountainash_files.specs.source",
+        "mountainash_files._glob",
+        "mountainash_files._operations"
+      ],
+      "chapter": "selecting-files",
+      "section": "Globs"
+    },
+    {
+      "id": 32,
+      "label": "Glob Segment Semantics",
+      "group": "SEL",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._glob"
+      ],
+      "chapter": "selecting-files",
+      "section": "Globs"
+    },
+    {
+      "id": 33,
+      "label": "Missing Files (on_missing)",
+      "group": "SEL",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.source",
+        "mountainash_files._operations"
+      ],
+      "chapter": "selecting-files",
+      "section": "Missing files"
+    },
+    {
+      "id": 34,
+      "label": "ZipArchive",
+      "group": "SEL",
+      "cis": 11,
+      "modules": [
+        "mountainash_files.specs.archive",
+        "mountainash_files._archives"
+      ],
+      "chapter": "selecting-files",
+      "section": "ZIP archives"
+    },
+    {
+      "id": 35,
+      "label": "ZIP Member Selection",
+      "group": "SEL",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.archive",
+        "mountainash_files._archives"
+      ],
+      "chapter": "selecting-files",
+      "section": "ZIP archives"
+    },
+    {
+      "id": 36,
+      "label": "Unrecognised Archive Members",
+      "group": "SEL",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.specs.archive",
+        "mountainash_files._operations"
+      ],
+      "chapter": "selecting-files",
+      "section": "ZIP archives"
+    },
+    {
+      "id": 37,
+      "label": "GzipCompression",
+      "group": "SEL",
+      "cis": 6,
+      "modules": [
+        "mountainash_files.specs.archive",
+        "mountainash_files._archives"
+      ],
+      "chapter": "selecting-files",
+      "section": "Gzip archives and decompression limits"
+    },
+    {
+      "id": 38,
+      "label": "Decompression Limits",
+      "group": "SEL",
+      "cis": 5,
+      "modules": [
+        "mountainash_files.specs.archive",
+        "mountainash_files._archives"
+      ],
+      "chapter": "selecting-files",
+      "section": "Gzip archives and decompression limits"
+    },
+    {
+      "id": 39,
+      "label": "Skipped Members in Results",
+      "group": "SEL",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._types",
+        "mountainash_files._operations"
+      ],
+      "chapter": "selecting-files",
+      "section": "ZIP archives"
+    },
+    {
+      "id": 40,
+      "label": "Storage Profile",
+      "group": "STOR",
+      "cis": 4,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Storage and auth profiles"
+    },
+    {
+      "id": 41,
+      "label": "Named Storage Profiles",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Storage and auth profiles"
+    },
+    {
+      "id": 42,
+      "label": "Auth Profile",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Storage and auth profiles"
+    },
+    {
+      "id": 43,
+      "label": "Location Policy",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Location policy"
+    },
+    {
+      "id": 44,
+      "label": "Transform Pipeline",
+      "group": "STOR",
+      "cis": 5,
+      "modules": [
+        "mountainash_files.specs.base",
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Compression and encryption transforms"
+    },
+    {
+      "id": 45,
+      "label": "Transform Inference (infer)",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.source",
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Compression and encryption transforms"
+    },
+    {
+      "id": 46,
+      "label": "Gzip Transform",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.source"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Compression and encryption transforms"
+    },
+    {
+      "id": 47,
+      "label": "GPG Encryption Transform",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.source"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Compression and encryption transforms"
+    },
+    {
+      "id": 48,
+      "label": "Stream Access Modes",
+      "group": "STOR",
+      "cis": 4,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Stream access"
+    },
+    {
+      "id": 49,
+      "label": "Range Policy",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Stream access"
+    },
+    {
+      "id": 50,
+      "label": "Remote URL Sources",
+      "group": "STOR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "storage-and-transforms",
+      "section": "Remote sources"
+    },
+    {
+      "id": 51,
+      "label": "CsvSpec",
+      "group": "DELIM",
+      "cis": 15,
+      "modules": [
+        "mountainash_files.formats.csv"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 52,
+      "label": "Delimiter and Quoting Options",
+      "group": "DELIM",
+      "cis": 3,
+      "modules": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._delimited"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 53,
+      "label": "Null Sequence",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._delimited"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 54,
+      "label": "Multi-Row Headers",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._rows"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 55,
+      "label": "Comment Rows",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._delimited"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 56,
+      "label": "CSV Column Selection",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 57,
+      "label": "CSV dtypes Overrides",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 58,
+      "label": "Temporal Inference",
+      "group": "FMT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._engines",
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats.json",
+        "mountainash_files.formats.xlsx"
+      ],
+      "chapter": "format-options",
+      "section": "Dates and times"
+    },
+    {
+      "id": 59,
+      "label": "Formula Neutralisation",
+      "group": "DELIM",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.csv"
+      ],
+      "chapter": "format-options",
+      "section": "CSV"
+    },
+    {
+      "id": 60,
+      "label": "TsvSpec",
+      "group": "DELIM",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats.tsv"
+      ],
+      "chapter": "format-options",
+      "section": "TSV"
+    },
+    {
+      "id": 61,
+      "label": "JsonSpec",
+      "group": "FMTS",
+      "cis": 6,
+      "modules": [
+        "mountainash_files.formats.json"
+      ],
+      "chapter": "format-options",
+      "section": "JSON and NDJSON"
+    },
+    {
+      "id": 62,
+      "label": "NDJSON",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.json"
+      ],
+      "chapter": "format-options",
+      "section": "JSON and NDJSON"
+    },
+    {
+      "id": 63,
+      "label": "JSON Property Path",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.json"
+      ],
+      "chapter": "format-options",
+      "section": "JSON and NDJSON"
+    },
+    {
+      "id": 64,
+      "label": "JSON Row Shapes",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.json"
+      ],
+      "chapter": "format-options",
+      "section": "JSON and NDJSON"
+    },
+    {
+      "id": 65,
+      "label": "Inference Sample Rows",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.json",
+        "mountainash_files.formats.xlsx"
+      ],
+      "chapter": "format-options",
+      "section": "Excel"
+    },
+    {
+      "id": 66,
+      "label": "ParquetSpec",
+      "group": "FMTS",
+      "cis": 8,
+      "modules": [
+        "mountainash_files.formats.parquet"
+      ],
+      "chapter": "format-options",
+      "section": "Parquet"
+    },
+    {
+      "id": 67,
+      "label": "Parquet Column Projection",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.parquet"
+      ],
+      "chapter": "format-options",
+      "section": "Parquet"
+    },
+    {
+      "id": 68,
+      "label": "XlsxSpec",
+      "group": "FMTS",
+      "cis": 8,
+      "modules": [
+        "mountainash_files.formats.xlsx"
+      ],
+      "chapter": "format-options",
+      "section": "Excel"
+    },
+    {
+      "id": 69,
+      "label": "Sheet Selection",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.xlsx",
+        "mountainash_files.formats._xlsx_calamine"
+      ],
+      "chapter": "format-options",
+      "section": "Excel"
+    },
+    {
+      "id": 70,
+      "label": "Excel Is Read-Only",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.xlsx",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "format-options",
+      "section": "Excel"
+    },
+    {
+      "id": 71,
+      "label": "Workbook Container Limits",
+      "group": "FMTS",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats.xlsx",
+        "mountainash_files._archives"
+      ],
+      "chapter": "format-options",
+      "section": "Excel"
+    },
+    {
+      "id": 72,
+      "label": "XmlSpec",
+      "group": "FMTS",
+      "cis": 4,
+      "modules": [
+        "mountainash_files.formats.xml"
+      ],
+      "chapter": "format-options",
+      "section": "XML"
+    },
+    {
+      "id": 73,
+      "label": "XPath Selection",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.xml"
+      ],
+      "chapter": "format-options",
+      "section": "XML"
+    },
+    {
+      "id": 74,
+      "label": "lxml and ElementTree Fallback",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.xml"
+      ],
+      "chapter": "format-options",
+      "section": "XML"
+    },
+    {
+      "id": 75,
+      "label": "Format Support Matrix",
+      "group": "FMTS",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "format-options",
+      "section": "What each format supports"
+    },
+    {
+      "id": 76,
+      "label": "inspect_schema",
+      "group": "SCHEMA",
+      "cis": 5,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files"
+      ],
+      "chapter": "schema-discovery",
+      "section": "Inspecting a schema"
+    },
+    {
+      "id": 77,
+      "label": "SchemaResult",
+      "group": "SCHEMA",
+      "cis": 9,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "schema-discovery",
+      "section": "Inspecting a schema"
+    },
+    {
+      "id": 78,
+      "label": "Schema Basis",
+      "group": "SCHEMA",
+      "cis": 3,
+      "modules": [
+        "mountainash_files.formats._types",
+        "mountainash_files._operations"
+      ],
+      "chapter": "schema-discovery",
+      "section": "How a schema was obtained"
+    },
+    {
+      "id": 79,
+      "label": "infer_schema_rows Budget",
+      "group": "SCHEMA",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "schema-discovery",
+      "section": "How a schema was obtained"
+    },
+    {
+      "id": 80,
+      "label": "inspect_schema_bytes",
+      "group": "SCHEMA",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "schema-discovery",
+      "section": "In-memory buffers"
+    },
+    {
+      "id": 81,
+      "label": "Footer-Only Parquet Schema",
+      "group": "SCHEMA",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats.parquet"
+      ],
+      "chapter": "schema-discovery",
+      "section": "Parquet footers"
+    },
+    {
+      "id": 82,
+      "label": "SchemaDiscoveryUnsupportedError",
+      "group": "SCHEMA",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._exceptions",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "errors",
+      "section": "Format errors"
+    },
+    {
+      "id": 83,
+      "label": "Write Disposition",
+      "group": "WRITE",
+      "cis": 5,
+      "modules": [
+        "mountainash_files.specs.sink",
+        "mountainash_files._operations"
+      ],
+      "chapter": "write-modes",
+      "section": "Replace and append"
+    },
+    {
+      "id": 84,
+      "label": "Parquet Append",
+      "group": "WRITE",
+      "cis": 4,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files.formats.parquet"
+      ],
+      "chapter": "write-modes",
+      "section": "Appending to Parquet"
+    },
+    {
+      "id": 85,
+      "label": "Append Schema Check",
+      "group": "WRITE",
+      "cis": 3,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "write-modes",
+      "section": "Appending to Parquet"
+    },
+    {
+      "id": 86,
+      "label": "create_path",
+      "group": "WRITE",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.specs.sink",
+        "mountainash_files._operations"
+      ],
+      "chapter": "write-modes",
+      "section": "Replace and append"
+    },
+    {
+      "id": 87,
+      "label": "Format Conversion",
+      "group": "WRITE",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "reading-and-writing",
+      "section": "Writing and converting"
+    },
+    {
+      "id": 88,
+      "label": "Raw Bytes Write",
+      "group": "WRITE",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "write-modes",
+      "section": "Replace and append"
+    },
+    {
+      "id": 89,
+      "label": "FormatError",
+      "group": "ERR",
+      "cis": 5,
+      "modules": [
+        "mountainash_files.formats._exceptions"
+      ],
+      "chapter": "errors",
+      "section": "Format errors"
+    },
+    {
+      "id": 90,
+      "label": "UnknownFormatError",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._exceptions",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "errors",
+      "section": "Format errors"
+    },
+    {
+      "id": 91,
+      "label": "ParseError",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._exceptions"
+      ],
+      "chapter": "errors",
+      "section": "Format errors"
+    },
+    {
+      "id": 92,
+      "label": "FormatConflictError",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._exceptions",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "custom-formats",
+      "section": "Registering a format"
+    },
+    {
+      "id": 93,
+      "label": "WriteError",
+      "group": "ERR",
+      "cis": 2,
+      "modules": [
+        "mountainash_files._exceptions"
+      ],
+      "chapter": "errors",
+      "section": "Write errors"
+    },
+    {
+      "id": 94,
+      "label": "AppendSchemaMismatchError",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._exceptions"
+      ],
+      "chapter": "errors",
+      "section": "Write errors"
+    },
+    {
+      "id": 95,
+      "label": "MissingDependencyError",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._exceptions"
+      ],
+      "chapter": "errors",
+      "section": "Missing optional dependencies"
+    },
+    {
+      "id": 96,
+      "label": "Archive Errors",
+      "group": "ERR",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._archives"
+      ],
+      "chapter": "errors",
+      "section": "Archive errors"
+    },
+    {
+      "id": 97,
+      "label": "register_format",
+      "group": "EXT",
+      "cis": 16,
+      "modules": [
+        "mountainash_files.formats._registry",
+        "mountainash_files"
+      ],
+      "chapter": "custom-formats",
+      "section": "Registering a format"
+    },
+    {
+      "id": 98,
+      "label": "FormatParser Protocol",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._protocols"
+      ],
+      "chapter": "custom-formats",
+      "section": "Format protocols"
+    },
+    {
+      "id": 99,
+      "label": "FormatSerialiser Protocol",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._protocols"
+      ],
+      "chapter": "custom-formats",
+      "section": "Format protocols"
+    },
+    {
+      "id": 100,
+      "label": "FormatSchemaInspector Protocol",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._protocols"
+      ],
+      "chapter": "custom-formats",
+      "section": "Format protocols"
+    },
+    {
+      "id": 101,
+      "label": "Lazy Dotted-Path Registration",
+      "group": "EXT",
+      "cis": 5,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "custom-formats",
+      "section": "Lazy registration and plugins"
+    },
+    {
+      "id": 102,
+      "label": "Entry-Point Plugins",
+      "group": "EXT",
+      "cis": 4,
+      "modules": [
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats"
+      ],
+      "chapter": "custom-formats",
+      "section": "Lazy registration and plugins"
+    },
+    {
+      "id": 103,
+      "label": "Registration Override",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "custom-formats",
+      "section": "Registering a format"
+    },
+    {
+      "id": 104,
+      "label": "Access Mode Registration",
+      "group": "EXT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "custom-formats",
+      "section": "Registering a format"
+    },
+    {
+      "id": 105,
+      "label": "Import-Light Plugin Modules",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "custom-formats",
+      "section": "Lazy registration and plugins"
+    },
+    {
+      "id": 106,
+      "label": "COMPLEX_HANDLER_KEY Linkage",
+      "group": "EXT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._types"
+      ],
+      "chapter": "custom-formats",
+      "section": "Complex formats and treespec"
+    },
+    {
+      "id": 107,
+      "label": "Read Pipeline",
+      "group": "INT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "architecture",
+      "section": "The read pipeline"
+    },
+    {
+      "id": 108,
+      "label": "Access Routing",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "architecture",
+      "section": "The read pipeline"
+    },
+    {
+      "id": 109,
+      "label": "Output Normalisation Seam",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "architecture",
+      "section": "One output seam"
+    },
+    {
+      "id": 110,
+      "label": "Format Registry Internals",
+      "group": "INT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "architecture",
+      "section": "Inside the registry"
+    },
+    {
+      "id": 111,
+      "label": "Registration Bootstrap",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats",
+        "mountainash_files",
+        "mountainash_files.formats._registry"
+      ],
+      "chapter": "architecture",
+      "section": "Inside the registry"
+    },
+    {
+      "id": 112,
+      "label": "Storage Boundary Principle",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations",
+        "mountainash_files._glob"
+      ],
+      "chapter": "architecture",
+      "section": "Package invariants"
+    },
+    {
+      "id": 113,
+      "label": "Lazy Import Invariant",
+      "group": "INT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files"
+      ],
+      "chapter": "architecture",
+      "section": "Package invariants"
+    },
+    {
+      "id": 114,
+      "label": "Engine Type Normalisation",
+      "group": "INT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats._engines"
+      ],
+      "chapter": "format-internals",
+      "section": "Engine output types"
+    },
+    {
+      "id": 115,
+      "label": "CSV Native Path vs Lexer",
+      "group": "INT",
+      "cis": 2,
+      "modules": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._delimited"
+      ],
+      "chapter": "format-internals",
+      "section": "CSV internals"
+    },
+    {
+      "id": 116,
+      "label": "Safe CSV Field Encoding",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._delimited"
+      ],
+      "chapter": "format-internals",
+      "section": "CSV internals"
+    },
+    {
+      "id": 117,
+      "label": "ZIP Container Hardening",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._archives"
+      ],
+      "chapter": "format-internals",
+      "section": "ZIP container hardening"
+    },
+    {
+      "id": 118,
+      "label": "Append Merge Semantics",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files._operations"
+      ],
+      "chapter": "format-internals",
+      "section": "Append merge rules"
+    },
+    {
+      "id": 119,
+      "label": "XLSX Calamine Reader",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.formats._xlsx_calamine"
+      ],
+      "chapter": "format-internals",
+      "section": "Excel internals"
+    },
+    {
+      "id": 120,
+      "label": "Package Version Source",
+      "group": "INT",
+      "cis": 1,
+      "modules": [
+        "mountainash_files.__version__"
+      ],
+      "chapter": "architecture",
+      "section": "Package invariants"
+    }
+  ],
+  "edges": [
+    {
+      "from": 4,
+      "to": 2
+    },
+    {
+      "from": 4,
+      "to": 3
+    },
+    {
+      "from": 5,
+      "to": 1
+    },
+    {
+      "from": 7,
+      "to": 5
+    },
+    {
+      "from": 8,
+      "to": 1
+    },
+    {
+      "from": 8,
+      "to": 5
+    },
+    {
+      "from": 9,
+      "to": 8
+    },
+    {
+      "from": 10,
+      "to": 8
+    },
+    {
+      "from": 11,
+      "to": 8
+    },
+    {
+      "from": 11,
+      "to": 14
+    },
+    {
+      "from": 12,
+      "to": 8
+    },
+    {
+      "from": 13,
+      "to": 1
+    },
+    {
+      "from": 14,
+      "to": 13
+    },
+    {
+      "from": 15,
+      "to": 13
+    },
+    {
+      "from": 15,
+      "to": 5
+    },
+    {
+      "from": 16,
+      "to": 13
+    },
+    {
+      "from": 17,
+      "to": 13
+    },
+    {
+      "from": 17,
+      "to": 15
+    },
+    {
+      "from": 17,
+      "to": 16
+    },
+    {
+      "from": 18,
+      "to": 15
+    },
+    {
+      "from": 19,
+      "to": 15
+    },
+    {
+      "from": 19,
+      "to": 14
+    },
+    {
+      "from": 20,
+      "to": 14
+    },
+    {
+      "from": 21,
+      "to": 14
+    },
+    {
+      "from": 21,
+      "to": 4
+    },
+    {
+      "from": 22,
+      "to": 9
+    },
+    {
+      "from": 22,
+      "to": 17
+    },
+    {
+      "from": 22,
+      "to": 23
+    },
+    {
+      "from": 23,
+      "to": 2
+    },
+    {
+      "from": 23,
+      "to": 14
+    },
+    {
+      "from": 24,
+      "to": 22
+    },
+    {
+      "from": 24,
+      "to": 4
+    },
+    {
+      "from": 24,
+      "to": 2
+    },
+    {
+      "from": 24,
+      "to": 3
+    },
+    {
+      "from": 25,
+      "to": 22
+    },
+    {
+      "from": 25,
+      "to": 14
+    },
+    {
+      "from": 26,
+      "to": 10
+    },
+    {
+      "from": 26,
+      "to": 17
+    },
+    {
+      "from": 27,
+      "to": 26
+    },
+    {
+      "from": 27,
+      "to": 14
+    },
+    {
+      "from": 28,
+      "to": 9
+    },
+    {
+      "from": 28,
+      "to": 10
+    },
+    {
+      "from": 29,
+      "to": 9
+    },
+    {
+      "from": 29,
+      "to": 7
+    },
+    {
+      "from": 30,
+      "to": 22
+    },
+    {
+      "from": 31,
+      "to": 9
+    },
+    {
+      "from": 31,
+      "to": 7
+    },
+    {
+      "from": 32,
+      "to": 31
+    },
+    {
+      "from": 33,
+      "to": 9
+    },
+    {
+      "from": 34,
+      "to": 9
+    },
+    {
+      "from": 35,
+      "to": 34
+    },
+    {
+      "from": 36,
+      "to": 34
+    },
+    {
+      "from": 36,
+      "to": 17
+    },
+    {
+      "from": 37,
+      "to": 9
+    },
+    {
+      "from": 38,
+      "to": 34
+    },
+    {
+      "from": 38,
+      "to": 37
+    },
+    {
+      "from": 39,
+      "to": 36
+    },
+    {
+      "from": 39,
+      "to": 23
+    },
+    {
+      "from": 40,
+      "to": 7
+    },
+    {
+      "from": 40,
+      "to": 8
+    },
+    {
+      "from": 41,
+      "to": 40
+    },
+    {
+      "from": 42,
+      "to": 40
+    },
+    {
+      "from": 43,
+      "to": 8
+    },
+    {
+      "from": 43,
+      "to": 7
+    },
+    {
+      "from": 44,
+      "to": 7
+    },
+    {
+      "from": 44,
+      "to": 8
+    },
+    {
+      "from": 45,
+      "to": 44
+    },
+    {
+      "from": 45,
+      "to": 18
+    },
+    {
+      "from": 46,
+      "to": 44
+    },
+    {
+      "from": 47,
+      "to": 44
+    },
+    {
+      "from": 47,
+      "to": 6
+    },
+    {
+      "from": 48,
+      "to": 29
+    },
+    {
+      "from": 48,
+      "to": 7
+    },
+    {
+      "from": 49,
+      "to": 48
+    },
+    {
+      "from": 50,
+      "to": 40
+    },
+    {
+      "from": 50,
+      "to": 6
+    },
+    {
+      "from": 51,
+      "to": 14
+    },
+    {
+      "from": 52,
+      "to": 51
+    },
+    {
+      "from": 53,
+      "to": 51
+    },
+    {
+      "from": 54,
+      "to": 51
+    },
+    {
+      "from": 55,
+      "to": 51
+    },
+    {
+      "from": 56,
+      "to": 51
+    },
+    {
+      "from": 56,
+      "to": 2
+    },
+    {
+      "from": 57,
+      "to": 51
+    },
+    {
+      "from": 57,
+      "to": 2
+    },
+    {
+      "from": 58,
+      "to": 14
+    },
+    {
+      "from": 58,
+      "to": 2
+    },
+    {
+      "from": 59,
+      "to": 51
+    },
+    {
+      "from": 59,
+      "to": 26
+    },
+    {
+      "from": 60,
+      "to": 51
+    },
+    {
+      "from": 61,
+      "to": 14
+    },
+    {
+      "from": 62,
+      "to": 61
+    },
+    {
+      "from": 62,
+      "to": 19
+    },
+    {
+      "from": 63,
+      "to": 61
+    },
+    {
+      "from": 64,
+      "to": 61
+    },
+    {
+      "from": 64,
+      "to": 4
+    },
+    {
+      "from": 65,
+      "to": 61
+    },
+    {
+      "from": 65,
+      "to": 68
+    },
+    {
+      "from": 66,
+      "to": 14
+    },
+    {
+      "from": 67,
+      "to": 66
+    },
+    {
+      "from": 67,
+      "to": 2
+    },
+    {
+      "from": 68,
+      "to": 14
+    },
+    {
+      "from": 68,
+      "to": 6
+    },
+    {
+      "from": 69,
+      "to": 68
+    },
+    {
+      "from": 70,
+      "to": 68
+    },
+    {
+      "from": 70,
+      "to": 26
+    },
+    {
+      "from": 71,
+      "to": 68
+    },
+    {
+      "from": 71,
+      "to": 38
+    },
+    {
+      "from": 72,
+      "to": 14
+    },
+    {
+      "from": 72,
+      "to": 4
+    },
+    {
+      "from": 73,
+      "to": 72
+    },
+    {
+      "from": 74,
+      "to": 72
+    },
+    {
+      "from": 74,
+      "to": 6
+    },
+    {
+      "from": 75,
+      "to": 51
+    },
+    {
+      "from": 75,
+      "to": 60
+    },
+    {
+      "from": 75,
+      "to": 61
+    },
+    {
+      "from": 75,
+      "to": 66
+    },
+    {
+      "from": 75,
+      "to": 68
+    },
+    {
+      "from": 75,
+      "to": 72
+    },
+    {
+      "from": 75,
+      "to": 21
+    },
+    {
+      "from": 76,
+      "to": 22
+    },
+    {
+      "from": 76,
+      "to": 77
+    },
+    {
+      "from": 77,
+      "to": 2
+    },
+    {
+      "from": 77,
+      "to": 14
+    },
+    {
+      "from": 78,
+      "to": 77
+    },
+    {
+      "from": 79,
+      "to": 76
+    },
+    {
+      "from": 80,
+      "to": 76
+    },
+    {
+      "from": 80,
+      "to": 25
+    },
+    {
+      "from": 81,
+      "to": 76
+    },
+    {
+      "from": 81,
+      "to": 66
+    },
+    {
+      "from": 81,
+      "to": 78
+    },
+    {
+      "from": 82,
+      "to": 76
+    },
+    {
+      "from": 82,
+      "to": 89
+    },
+    {
+      "from": 83,
+      "to": 10
+    },
+    {
+      "from": 83,
+      "to": 26
+    },
+    {
+      "from": 84,
+      "to": 83
+    },
+    {
+      "from": 84,
+      "to": 66
+    },
+    {
+      "from": 84,
+      "to": 21
+    },
+    {
+      "from": 85,
+      "to": 84
+    },
+    {
+      "from": 86,
+      "to": 10
+    },
+    {
+      "from": 87,
+      "to": 22
+    },
+    {
+      "from": 87,
+      "to": 26
+    },
+    {
+      "from": 88,
+      "to": 26
+    },
+    {
+      "from": 89,
+      "to": 13
+    },
+    {
+      "from": 90,
+      "to": 89
+    },
+    {
+      "from": 90,
+      "to": 17
+    },
+    {
+      "from": 91,
+      "to": 89
+    },
+    {
+      "from": 91,
+      "to": 22
+    },
+    {
+      "from": 92,
+      "to": 89
+    },
+    {
+      "from": 92,
+      "to": 97
+    },
+    {
+      "from": 93,
+      "to": 26
+    },
+    {
+      "from": 94,
+      "to": 93
+    },
+    {
+      "from": 94,
+      "to": 85
+    },
+    {
+      "from": 95,
+      "to": 6
+    },
+    {
+      "from": 96,
+      "to": 38
+    },
+    {
+      "from": 97,
+      "to": 14
+    },
+    {
+      "from": 97,
+      "to": 17
+    },
+    {
+      "from": 98,
+      "to": 14
+    },
+    {
+      "from": 99,
+      "to": 14
+    },
+    {
+      "from": 100,
+      "to": 14
+    },
+    {
+      "from": 100,
+      "to": 78
+    },
+    {
+      "from": 101,
+      "to": 97
+    },
+    {
+      "from": 102,
+      "to": 97
+    },
+    {
+      "from": 102,
+      "to": 101
+    },
+    {
+      "from": 103,
+      "to": 97
+    },
+    {
+      "from": 104,
+      "to": 97
+    },
+    {
+      "from": 104,
+      "to": 48
+    },
+    {
+      "from": 105,
+      "to": 102
+    },
+    {
+      "from": 106,
+      "to": 14
+    },
+    {
+      "from": 106,
+      "to": 4
+    },
+    {
+      "from": 107,
+      "to": 22
+    },
+    {
+      "from": 107,
+      "to": 31
+    },
+    {
+      "from": 107,
+      "to": 34
+    },
+    {
+      "from": 107,
+      "to": 17
+    },
+    {
+      "from": 108,
+      "to": 107
+    },
+    {
+      "from": 108,
+      "to": 104
+    },
+    {
+      "from": 108,
+      "to": 44
+    },
+    {
+      "from": 109,
+      "to": 24
+    },
+    {
+      "from": 109,
+      "to": 21
+    },
+    {
+      "from": 110,
+      "to": 97
+    },
+    {
+      "from": 110,
+      "to": 102
+    },
+    {
+      "from": 111,
+      "to": 110
+    },
+    {
+      "from": 112,
+      "to": 7
+    },
+    {
+      "from": 113,
+      "to": 6
+    },
+    {
+      "from": 114,
+      "to": 2
+    },
+    {
+      "from": 115,
+      "to": 51
+    },
+    {
+      "from": 115,
+      "to": 52
+    },
+    {
+      "from": 116,
+      "to": 115
+    },
+    {
+      "from": 116,
+      "to": 26
+    },
+    {
+      "from": 117,
+      "to": 38
+    },
+    {
+      "from": 117,
+      "to": 71
+    },
+    {
+      "from": 118,
+      "to": 85
+    },
+    {
+      "from": 119,
+      "to": 68
+    },
+    {
+      "from": 119,
+      "to": 114
+    },
+    {
+      "from": 120,
+      "to": 113
+    }
+  ],
+  "source_revision": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "profile_basis": "docs-site/profile/manifest.json",
+  "chapter_mapping": {
+    "basis": "docs-site/chapter-plan.md",
+    "approved": "2026-10-29",
+    "change": "initial editorial mapping after chapter-plan approval"
+  }
+}

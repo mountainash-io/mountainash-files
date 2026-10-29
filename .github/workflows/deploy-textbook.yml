@@ -1,0 +1,173 @@
+name: Deploy Textbook
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs-site/**'
+      - '.github/workflows/deploy-textbook.yml'
+  workflow_dispatch:
+
+# Serialize snapshot selection, both builds, and deployment across live branches.
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: vars.TEXTBOOK_PUBLISHING_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-24.04
+    outputs:
+      main_sha: ${{ steps.snapshots.outputs.main_sha }}
+      develop_sha: ${{ steps.snapshots.outputs.develop_sha }}
+      main_has_textbook: ${{ steps.snapshots.outputs.main_has_textbook }}
+    steps:
+      - name: Check out production branch snapshot
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/main
+          path: prod
+          persist-credentials: false
+
+      - name: Check out development branch snapshot
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/develop
+          path: dev
+          persist-credentials: false
+
+      - name: Record checked-out branch snapshots
+        id: snapshots
+        shell: bash
+        run: |
+          main_sha=$(git -C prod rev-parse --verify HEAD)
+          develop_sha=$(git -C dev rev-parse --verify HEAD)
+          [[ "$main_sha" =~ ^[0-9a-f]{40}$ && "$develop_sha" =~ ^[0-9a-f]{40}$ ]]
+          printf 'main_sha=%s\ndevelop_sha=%s\n' "$main_sha" "$develop_sha" >> "$GITHUB_OUTPUT"
+          # Until a release brings the textbook to main, publish the develop snapshot alone.
+          if [[ -f prod/docs-site/site/mkdocs.yml ]]; then
+            echo 'main_has_textbook=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'main_has_textbook=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::main has no textbook yet; publishing the develop snapshot only, under dev/.'
+          fi
+          {
+            printf '## Selected textbook snapshots\n\n'
+            printf -- '- Production (`main`): `%s`\n' "$main_sha"
+            printf -- '- Development (`develop`): `%s`\n' "$develop_sha"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Build production textbook
+        if: steps.snapshots.outputs.main_has_textbook == 'true'
+        working-directory: prod/docs-site/site
+        env:
+          TEXTBOOK_SITE_URL: https://docs.mountainash.io/mountainash-files/
+          TEXTBOOK_EDIT_URI: edit/main/docs-site/site/docs/
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/prod-venv"
+          "$RUNNER_TEMP/prod-venv/bin/python" -m pip install --disable-pip-version-check -r ../requirements.txt
+          "$RUNNER_TEMP/prod-venv/bin/python" -m mkdocs build --strict --config-file mkdocs.yml --site-dir "$RUNNER_TEMP/prod-output"
+
+      - name: Build development textbook
+        working-directory: dev/docs-site/site
+        env:
+          TEXTBOOK_SITE_URL: https://docs.mountainash.io/mountainash-files/dev/
+          TEXTBOOK_EDIT_URI: edit/develop/docs-site/site/docs/
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/dev-venv"
+          "$RUNNER_TEMP/dev-venv/bin/python" -m pip install --disable-pip-version-check -r ../requirements.txt
+          "$RUNNER_TEMP/dev-venv/bin/python" -m mkdocs build --strict --config-file mkdocs.yml --site-dir "$RUNNER_TEMP/dev-output"
+
+      - name: Assemble paired Pages artifact
+        env:
+          MAIN_HAS_TEXTBOOK: ${{ steps.snapshots.outputs.main_has_textbook }}
+        shell: bash
+        run: |
+          mkdir "$RUNNER_TEMP/pages-artifact"
+          if [[ "$MAIN_HAS_TEXTBOOK" == 'true' ]]; then
+            if [[ -e "$RUNNER_TEMP/prod-output/dev" || -L "$RUNNER_TEMP/prod-output/dev" ]]; then
+              echo "::error::Production output occupies the reserved dev/ path."
+              exit 1
+            fi
+            cp -a "$RUNNER_TEMP/prod-output/." "$RUNNER_TEMP/pages-artifact/"
+          else
+            # No production textbook yet: the root redirects to the development snapshot.
+            printf '%s\n' '<!doctype html><meta charset="utf-8"><title>mountainash-files</title>' \
+              '<meta http-equiv="refresh" content="0; url=dev/">' \
+              '<link rel="canonical" href="dev/"><a href="dev/">mountainash-files development documentation</a>' \
+              > "$RUNNER_TEMP/pages-artifact/index.html"
+          fi
+          mkdir "$RUNNER_TEMP/pages-artifact/dev"
+          cp -a "$RUNNER_TEMP/dev-output/." "$RUNNER_TEMP/pages-artifact/dev/"
+
+      - name: Upload complete Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: ${{ runner.temp }}/pages-artifact
+
+  deploy:
+    needs: build
+    if: vars.TEXTBOOK_PUBLISHING_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check snapshot freshness before deployment
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTED_MAIN_SHA: ${{ needs.build.outputs.main_sha }}
+          SELECTED_DEVELOP_SHA: ${{ needs.build.outputs.develop_sha }}
+        shell: bash
+        run: |
+          main_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          develop_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/develop" --jq '.object.sha')
+          [[ "$main_sha" =~ ^[0-9a-f]{40}$ && "$develop_sha" =~ ^[0-9a-f]{40}$ ]]
+          # Compare build inputs, so a code-only push cannot strand this deployment.
+          textbook_inputs() {
+            local revision="$1" site workflow
+            site=$(gh api "repos/$GITHUB_REPOSITORY/git/trees/$revision" --jq '.tree[] | select(.path == "docs-site" and .type == "tree") | .sha')
+            # A branch the textbook has not reached yet (main before its first release).
+            if [[ -z "$site" ]]; then printf 'absent\n'; return 0; fi
+            workflow=$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/deploy-textbook.yml?ref=$revision" --jq '.sha')
+            [[ "$site" =~ ^[0-9a-f]{40}$ && "$workflow" =~ ^[0-9a-f]{40}$ ]] || return 1
+            printf '%s:%s\n' "$site" "$workflow"
+          }
+          selected_main_inputs=$(textbook_inputs "$SELECTED_MAIN_SHA")
+          selected_develop_inputs=$(textbook_inputs "$SELECTED_DEVELOP_SHA")
+          current_main_inputs=$(textbook_inputs "$main_sha")
+          current_develop_inputs=$(textbook_inputs "$develop_sha")
+          if [[ "$current_main_inputs" == "$selected_main_inputs" && "$current_develop_inputs" == "$selected_develop_inputs" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+            echo 'Textbook inputs on both branches are current; deploying the paired textbook.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::Textbook snapshot pair is obsolete; skipping deployment, not a build failure.'
+            {
+              printf '## Obsolete snapshot pair — deployment skipped\n\n'
+              printf 'Textbook inputs changed during this run. The previous live deployment is unchanged.\n\n'
+              printf -- '- Current `main`: `%s` (selected `%s`)\n' "$main_sha" "$SELECTED_MAIN_SHA"
+              printf -- '- Current `develop`: `%s` (selected `%s`)\n' "$develop_sha" "$SELECTED_DEVELOP_SHA"
+              printf '\nThe pending push run will build current heads; use manual dispatch if that run was canceled.\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Deploy to GitHub Pages
+        if: steps.freshness.outputs.current == 'true'
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

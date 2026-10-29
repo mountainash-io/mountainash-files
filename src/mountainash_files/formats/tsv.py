@@ -4,21 +4,25 @@ import dataclasses
 from typing import ClassVar
 
 from mountainash_files.formats._registry import register_format
-from mountainash_files.formats._types import FormatSpec
-from mountainash_files.formats.csv import csv_parse
+from mountainash_files.formats.csv import (
+    CsvSpec,
+    csv_inspect_schema,
+    csv_parse,
+    csv_schema_access,
+    csv_serialise,
+)
 
 
 @dataclasses.dataclass(frozen=True)
-class TsvSpec(FormatSpec):
+class TsvSpec(CsvSpec):
     FORMAT: ClassVar[str] = "tsv"
     SUFFIXES: ClassVar[tuple[str, ...]] = (".tsv", ".tab")
-    delimiter: ClassVar[str] = "\t"
+    MEDIATYPES: ClassVar[tuple[str, ...]] = ("text/tab-separated-values",)
 
-    encoding: str = "utf-8"
-    skip_rows: int = 0
-    header_row: int | None = 0
-    columns: tuple[str, ...] | None = None
-    dtypes: tuple[tuple[str, str], ...] | None = None
+    delimiter: str = "\t"
 
 
-register_format(TsvSpec, csv_parse)
+register_format(
+    TsvSpec, csv_parse, serialiser=csv_serialise,
+    schema_inspector=csv_inspect_schema, schema_access=csv_schema_access,
+)

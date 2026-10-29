@@ -1,0 +1,64 @@
+{
+  "id": "mountainash_files.formats._protocols",
+  "path": "src/mountainash_files/formats/_protocols.py",
+  "summary": "Runtime-checkable call protocols for format parsers, serialisers and schema inspectors. Parsers and inspectors must accept both bytes and BinaryIO, and inspectors must not close a stream they borrow.",
+  "role": "protocol",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [
+    "FormatParser",
+    "FormatSerialiser",
+    "FormatSchemaInspector"
+  ],
+  "key_classes": [
+    "FormatParser",
+    "FormatSerialiser",
+    "FormatSchemaInspector"
+  ],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files.formats._types"
+  ],
+  "dependents": [
+    "mountainash_files"
+  ],
+  "extension_points": [
+    "Implement FormatParser / FormatSerialiser / FormatSchemaInspector for a custom format"
+  ],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Writing a parser: bytes vs stream input and the return-type contract"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_protocols.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "protocols re-exported"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_protocols.py",
+      "detail": "protocol conformance"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

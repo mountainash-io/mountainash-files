@@ -1,12 +1,23 @@
+import gzip
 from pathlib import Path
 
 import pytest
+from mountainash_transport import PathNotFoundError
 
 from mountainash_files import copy
 from mountainash_files.specs.source import FileSourceSpec
 from mountainash_files.specs.sink import FileSinkSpec
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.mark.parametrize("infer", [None, False, True])
+def test_copy_inference_override(tmp_path, infer):
+    payload = gzip.compress(b"x\n1\n", mtime=0)
+    src, dst = tmp_path / "rows.csv.gz", tmp_path / "copy.bin"
+    src.write_bytes(payload)
+    copy(FileSourceSpec(path=str(src), infer=infer), FileSinkSpec(path=str(dst)))
+    assert dst.read_bytes() == (payload if infer is False else b"x\n1\n")
 
 
 class TestCopyLocal:
@@ -26,7 +37,7 @@ class TestCopyLocal:
     def test_copy_missing_raises(self):
         source = FileSourceSpec(path="/nonexistent/file.csv")
         sink = FileSinkSpec(path="/tmp/out.csv")
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(PathNotFoundError):
             copy(source, sink)
 
     def test_copy_missing_skip(self, tmp_path):

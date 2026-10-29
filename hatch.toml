@@ -7,17 +7,76 @@ path = "src/mountainash_files/__version__.py"
 [build.targets.wheel]
 packages = ["src/mountainash_files"]
 
+[build.targets.sdist]
+include = ["/src", "/tests", "/tests_optional", "/tools", "/docs", "/examples", "/pyproject.toml", "/hatch.toml", "/requirements-hatch.txt", "/README.md", "/CONTRIBUTING.md", "/RELEASE.md", "/LICENSE", "/NOTICE"]
+
+#================
+# Env: build_github
+#================
+[envs.build_github]
+python = "3.12"
+installer = "uv"
+# Hatch installs the project before syncing environment dependencies.
+dependencies = [
+    "cyclonedx-bom==4.5.0",
+
+    "mountainash_settings @    {root:uri}/temp/mountainash-settings",
+    "mountainash_auth_client @ {root:uri}/temp/mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/temp/mountainash-transport",
+]
+[envs.build_github.scripts]
+sbom-all = "cyclonedx-py environment > ./sbom-full.json"
+sbom-direct = "cyclonedx-py requirements > ./sbom-direct.json"
+export-requirements = "hatch dep show requirements > ./requirements.txt"
+
+#================
+# Env: default
+#================
 [envs.default]
+python = "3.12"
 installer = "uv"
 path = ".venv"
+features = ["http"]
+# Hatch installs the project before syncing environment dependencies.
 dependencies = [
-    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/../mountainash-transport",
 ]
 
-[[envs.test.matrix]]
+#================
+# Env: test_github
+#================
+[[envs.test_github.matrix]]
 python = ["3.12"]
+
+[envs.test_github]
+installer = "uv"
+path = ".hatch/test-github"
+# Hatch installs the project before syncing environment dependencies.
+dependencies = [
+    "pytest==8.3.5",
+    "pytest-check==2.5.3",
+    "pytest-mock==3.12.0",
+    "pytest-cov>=4.1.0",
+    "pytest-clarity>=1.0.1",
+    "openpyxl>=3.1",
+    "fastexcel>=0.21,<0.22",
+    "lxml>=6.1.0",
+
+    "mountainash_settings @    {root:uri}/temp/mountainash-settings",
+    "mountainash_auth_client @ {root:uri}/temp/mountainash-auth-client",
+    "mountainash_transport @   {root:uri}/temp/mountainash-transport",
+]
+[envs.test_github.scripts]
+test = "pytest"
+cov = "pytest --cov --junitxml=junit.xml -o junit_family=legacy --cov-report=xml"
+
+#================
+# Env: test
+#================
+[[envs.test.matrix]]
+python = ["3.12", "3.13"]
 
 [envs.test]
 installer = "uv"
@@ -28,21 +87,24 @@ dependencies = [
     "pytest-cov>=4.1.0",
     "pytest-clarity>=1.0.1",
     "openpyxl>=3.1",
-    "fastexcel>=0.12",
-    "lxml>=4.9",
-    "mountainash_utils_files @ {root:uri}/../mountainash-utils-files",
+    "fastexcel>=0.21,<0.22",
+    "lxml>=6.1.0",
     "mountainash_settings @    {root:uri}/../mountainash-settings",
     "mountainash_auth_client @ {root:uri}/../mountainash-auth-client",
-    "mountainash @             {root:uri}/../mountainash",
-    "mountainash_files @ {root:uri}",
+    "mountainash_transport @   {root:uri}/../mountainash-transport",
 ]
+[envs.test.overrides]
+matrix.python.path = [
+    { value = ".hatch/test-py3.12", if = ["3.12"] },
+    { value = ".hatch/test-py3.13", if = ["3.13"] },
+]
+
 [envs.test.scripts]
 test = "pytest"
 cov = "pytest --cov --cov-report=term-missing"
-
 [envs.ruff]
 installer = "uv"
-skip-install = true
+detached = true
 dependencies = ["ruff==0.3.7"]
 [envs.ruff.scripts]
 check = "ruff check ./src"
@@ -50,6 +112,50 @@ fix = "ruff check ./src --fix"
 
 [envs.mypy]
 installer = "uv"
-dependencies = ["mypy==1.10.1"]
+path = ".hatch/mypy"
+# Install typing dependencies during provisioning, not as a side effect of checking.
+dependencies = [
+    "mypy==1.10.1",
+    "pytest==8.3.5",
+    "packaging>=24.0",
+    "pyarrow-stubs==20.0.0.20260819",
+    "lxml-stubs==0.5.1",
+    "types-openpyxl==3.1.5.20260827",
+    "types-PyYAML==6.0.12.20260906",
+    # Ships py.typed; the xlsx extra is not installed into this env otherwise.
+    "fastexcel>=0.21,<0.22",
+]
 [envs.mypy.scripts]
-check = "mypy --install-types --non-interactive {args:src/mountainash_files tests}"
+check = "mypy {args:src/mountainash_files tests}"
+check-src = "mypy src/mountainash_files {args}"
+check-tests = "mypy tests {args}"
+check-src-untyped = "mypy --check-untyped-defs src/mountainash_files {args}"
+check-tests-untyped = "mypy --check-untyped-defs tests {args}"
+
+[envs.typing]
+detached = true
+installer = "uv"
+python = "3.12"
+dependencies = ["build==1.4.0", "packaging>=24.0"]
+[envs.typing.scripts]
+qualify = "python tools/qualify_typing.py {args}"
+
+[envs.test_mountainash]
+template = "test"
+path = ".hatch/test-mountainash"
+extra-dependencies = ["mountainash @ {root:uri}/../mountainash"]
+
+[envs.test_mountainash.scripts]
+test = "pytest tests_optional/mountainash {args}"
+
+[envs.default.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/.."
+
+[envs.test_github.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/temp"
+
+[envs.build_github.env-vars]
+UV_CONSTRAINT = "{root}/requirements-hatch.txt"
+HATCH_SIBLINGS = "{root:uri}/temp"

@@ -1,0 +1,113 @@
+{
+  "id": "mountainash_files.formats._registry",
+  "path": "src/mountainash_files/formats/_registry.py",
+  "summary": "Thread-safe format registry. Maps format keys, suffixes and media types to spec classes, parsers, serialisers, schema inspectors and access modes; accepts lazy 'package.module:attr' references; resolves formats by explicit key, then media type, then suffix (skipping transform suffixes such as .gz); and loads entry-point plugins, recording any that fail.",
+  "role": "protocol",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "register_format"
+  ],
+  "key_classes": [],
+  "key_functions": [
+    "register_format",
+    "resolve_format",
+    "get_parser",
+    "get_serialiser",
+    "get_spec_class",
+    "get_access",
+    "get_schema_inspector",
+    "get_schema_access",
+    "get_suffix_overrides",
+    "_discover_entrypoint_formats",
+    "_reset_registry"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._types",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.tsv",
+    "mountainash_files.formats.xlsx",
+    "mountainash_files.formats.xml"
+  ],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.formats",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.tsv",
+    "mountainash_files.formats.xlsx",
+    "mountainash_files.formats.xml"
+  ],
+  "extension_points": [
+    "register_format(spec_cls, parser, serialiser=, schema_inspector=, access=, schema_access=, suffix_overrides=, override=)",
+    "Lazy string references resolved on first use",
+    "Entry-point group mountainash_files.formats",
+    "access: 'bytes' | 'random' | callable(spec)",
+    "schema_access: 'bytes' | 'random' | 'sequential' | callable(spec, rows)"
+  ],
+  "lifecycle_notes": [
+    "Registering a key, suffix or media type that is already owned raises FormatConflictError unless override=True; an override first removes the old owner's suffixes and media types.",
+    "Lazy references are resolved on first use and cached in place."
+  ],
+  "documentation_hooks": [
+    "Custom formats guide",
+    "Format resolution precedence",
+    "Plugin authoring via entry points"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_registry.py",
+    "tests/test_registry_lazy.py",
+    "tests/test_entrypoint_discovery.py",
+    "tests/test_access_routing.py",
+    "tests/test_serialisers.py",
+    "tests/test_schema_discovery.py"
+  ],
+  "risks": [
+    "_register_builtin_formats repeats the registration arguments from each format module's register_format call, so the two copies can drift apart."
+  ],
+  "open_questions": [
+    "Should the internal getters (get_parser, resolve_format) become a public introspection API for extension authors?"
+  ],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "register_format re-exported"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/advanced-usage.md",
+      "detail": "Custom formats section"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/migration-reader-engines.md",
+      "detail": "Plugin formats section"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_registry_lazy.py",
+      "detail": "lazy dotted-path registrations"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

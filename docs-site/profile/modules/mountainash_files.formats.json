@@ -1,0 +1,64 @@
+{
+  "id": "mountainash_files.formats",
+  "path": "src/mountainash_files/formats/__init__.py",
+  "summary": "Imports the six built-in format modules, whose module-level register_format calls register them, then runs entry-point discovery for the mountainash_files.formats plugin group.",
+  "role": "orchestration",
+  "visibility": "internal",
+  "stability": "stable",
+  "audiences": [
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.tsv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.xlsx",
+    "mountainash_files.formats.xml",
+    "mountainash_files.formats._registry"
+  ],
+  "dependents": [
+    "mountainash_files"
+  ],
+  "extension_points": [
+    "Entry-point group mountainash_files.formats"
+  ],
+  "lifecycle_notes": [
+    "Discovery runs once per process, guarded by the _DISCOVERY_DONE latch in _registry."
+  ],
+  "documentation_hooks": [
+    "Format registration bootstrap and plugin discovery order"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_entrypoint_discovery.py",
+    "tests/test_registry.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/formats/__init__.py",
+      "detail": "imports csv/tsv/json/parquet/xlsx/xml then _discover_entrypoint_formats()"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_entrypoint_discovery.py",
+      "detail": "plugin discovery via entry_points"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

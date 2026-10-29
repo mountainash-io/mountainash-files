@@ -1,0 +1,52 @@
+{
+  "id": "mountainash_files.__version__",
+  "path": "src/mountainash_files/__version__.py",
+  "summary": "Holds the package version string, which hatch reads as the dynamic project version.",
+  "role": "public-api",
+  "visibility": "internal",
+  "stability": "stable",
+  "audiences": [
+    "maintainers"
+  ],
+  "doc_priority": "reference-only",
+  "confidence": "high",
+  "public_api": [
+    "__version__"
+  ],
+  "key_classes": [],
+  "key_functions": [],
+  "dependencies": [],
+  "dependents": [],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "Release tooling bumps this file; versions follow the CalVer release flow in RELEASE.md."
+  ],
+  "documentation_hooks": [],
+  "examples": [],
+  "tests": [
+    "tests/test_release_provenance.py"
+  ],
+  "risks": [],
+  "open_questions": [
+    "The root package does not import this module. Should the version be exposed at runtime?"
+  ],
+  "evidence": [
+    {
+      "kind": "config",
+      "path": "hatch.toml",
+      "detail": "[version] path = src/mountainash_files/__version__.py"
+    },
+    {
+      "kind": "config",
+      "path": "pyproject.toml",
+      "detail": "dynamic = [\"version\"]"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

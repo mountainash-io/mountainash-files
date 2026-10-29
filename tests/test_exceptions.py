@@ -5,6 +5,15 @@ from mountainash_files.formats._exceptions import (
     FormatConflictError,
 )
 
+import builtins
+
+import pytest
+
+from mountainash_files import MissingDependencyError, parse, FileSourceSpec
+from pathlib import Path
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
 
 def test_format_error_is_base():
     assert issubclass(UnknownFormatError, FormatError)
@@ -25,3 +34,32 @@ def test_parse_error_carries_format_key():
     assert err.format_key == "csv"
     assert "[csv]" in str(err)
     assert "malformed row 5" in str(err)
+
+
+def test_new_public_exports():
+    import mountainash_files as mf
+
+    assert callable(mf.parse)
+    for name in ("FormatParser", "FormatSerialiser", "FormatResolutionError"):
+        assert name in mf.__all__
+        assert hasattr(mf, name)
+
+
+class TestMissingDependencyError:
+    def test_message_names_the_extra(self):
+        err = MissingDependencyError("XLSX parsing", "xlsx")
+        assert "mountainash-files[xlsx]" in str(err)
+        assert err.extra == "xlsx"
+
+    def test_xlsx_without_engines_raises_missing_dependency(self, monkeypatch):
+        real_import = builtins.__import__
+
+        def blocked(name, *args, **kwargs):
+            if name in ("fastexcel", "openpyxl"):
+                raise ImportError(name)
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", blocked)
+        with pytest.raises(MissingDependencyError) as ei:
+            parse(FileSourceSpec(path=str(FIXTURES / "sample.xlsx")))
+        assert "mountainash-files[xlsx]" in str(ei.value)

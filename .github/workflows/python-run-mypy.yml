@@ -1,0 +1,122 @@
+name: Typing
+
+on:
+  pull_request:
+    paths:
+      - src/**
+      - tests/**
+      - tools/**
+      - README.md
+      - pyproject.toml
+      - hatch.toml
+      - requirements-hatch.txt
+      - .github/**
+  push:
+    branches: [develop, main]
+    paths:
+      - src/**
+      - tests/**
+      - tools/**
+      - README.md
+      - pyproject.toml
+      - hatch.toml
+      - requirements-hatch.txt
+      - .github/**
+  workflow_dispatch:
+    inputs:
+      fallback_branch:
+        description: Dependency fallback branch.
+        required: true
+        default: develop
+        type: choice
+        options: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  typing:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
+      - name: Generate dependency-read token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          owner: mountainash-io
+          repositories: |
+            mountainash-settings
+            mountainash-auth-client
+            mountainash-transport
+      - name: Load dependencies
+        id: dependencies
+        uses: ./.github/actions/load-dependencies
+        with:
+          config-path: .github/config/mountainash_dependencies.yml
+      - name: Check out dependencies
+        uses: ./.github/actions/checkout-dependencies
+        with:
+          dependencies: ${{ steps.dependencies.outputs.dependencies }}
+          target-branch: ${{ github.head_ref || github.ref_name }}
+          default-branch: ${{ inputs.fallback_branch || github.base_ref || github.ref_name }}
+          token: ${{ steps.app-token.outputs.token }}
+          org-name: mountainash-io
+      - name: Install build tools
+        run: python -m pip install build==1.4.0 packaging==26.3
+      - name: Build selected dependency wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/typing-dependencies"
+          for name in mountainash-settings mountainash-auth-client mountainash-transport; do
+            git -C "temp/$name" rev-parse HEAD > "$RUNNER_TEMP/typing-dependencies/$name-revision.log"
+            python -m build --wheel --outdir "$RUNNER_TEMP/typing-dependencies" "temp/$name" \
+              2>&1 | tee "$RUNNER_TEMP/typing-dependencies/$name-build.log"
+          done
+      - name: Install source-check dependencies
+        run: |
+          python - <<'PY'
+          import os, pathlib, subprocess, sys, tomllib
+          config = tomllib.loads(pathlib.Path("hatch.toml").read_text())
+          wheels = sorted((pathlib.Path(os.environ["RUNNER_TEMP"]) / "typing-dependencies").glob("*.whl"))
+          subprocess.run([sys.executable, "-m", "pip", "install", ".",
+                          *(str(w) for w in wheels), *config["envs"]["mypy"]["dependencies"]], check=True)
+          PY
+      - name: Check source and tests
+        id: source-check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m mypy src/mountainash_files tests 2>&1 | tee "$RUNNER_TEMP/source-mypy.log"
+      - name: Qualify installed wheels
+        if: ${{ !cancelled() && steps.source-check.outcome != 'skipped' }}
+        run: >-
+          python tools/qualify_typing.py
+          --output "$RUNNER_TEMP/files-typing"
+          --dependency-wheels "$RUNNER_TEMP/typing-dependencies"
+      - name: Upload typing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: typing-${{ matrix.python-version }}
+          path: |
+            ${{ runner.temp }}/source-mypy.log
+            ${{ runner.temp }}/typing-dependencies/
+            ${{ runner.temp }}/files-typing/*.log
+            ${{ runner.temp }}/files-typing/receipt.json
+            ${{ runner.temp }}/files-typing/direct/
+            ${{ runner.temp }}/files-typing/rebuilt/
+          if-no-files-found: warn

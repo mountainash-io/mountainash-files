@@ -27,9 +27,9 @@ class TestFileSinkSpec:
         sink = FileSinkSpec(path="/data.csv", format="csv")
         assert sink.format == "csv"
 
-    def test_with_auth_profile(self):
-        sink = FileSinkSpec(path="s3://bucket/out.parquet", auth_profile="prod")
-        assert sink.auth_profile == "prod"
+    def test_with_storage_profile_name(self):
+        sink = FileSinkSpec(path="s3://bucket/out.parquet", storage_profile="prod")
+        assert sink.storage_profile == "prod"
 
 
 class TestWriteError:
