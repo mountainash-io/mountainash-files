@@ -1,0 +1,96 @@
+{
+  "id": "mountainash_files.formats.csv",
+  "path": "src/mountainash_files/formats/csv.py",
+  "summary": "CSV format: CsvSpec options (delimiter, quoting, escape, null sequence, multi-row headers, comments, column and dtype selection, temporal handling, formula neutralisation), plus a parser that uses native pyarrow when the input allows and a lexer otherwise, a prefix-bounded schema inspector and a serialiser.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "CsvSpec"
+  ],
+  "key_classes": [
+    "CsvSpec"
+  ],
+  "key_functions": [
+    "csv_parse",
+    "csv_serialise",
+    "csv_inspect_schema",
+    "csv_schema_access",
+    "_native_eligible",
+    "_csv_prefix"
+  ],
+  "dependencies": [
+    "mountainash_files._exceptions",
+    "mountainash_files.formats._delimited",
+    "mountainash_files.formats._engines",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._rows",
+    "mountainash_files.formats._types"
+  ],
+  "dependents": [
+    "mountainash_files.formats.tsv",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [
+    "TsvSpec subclasses CsvSpec"
+  ],
+  "lifecycle_notes": [
+    "The native pyarrow path requires single-character ASCII tokens, no comments, contiguous header rows, safe line breaks and balanced quotes; any other input is lexed in Python and re-encoded as canonical CSV.",
+    "With formula_neutralise, the serialiser prefixes cells that start with a formula character (OWASP CSV injection). This is lossy and parsing does not reverse it."
+  ],
+  "documentation_hooks": [
+    "CSV options reference",
+    "Fast path vs lexer path",
+    "CSV injection protection on write"
+  ],
+  "examples": [
+    "examples/format_options/example.py",
+    "examples/local_files/example.py"
+  ],
+  "tests": [
+    "tests/test_csv.py",
+    "tests/test_tsv.py",
+    "tests/test_serialise_formats.py",
+    "tests/test_schema_discovery.py",
+    "tests/test_format_spec_contract.py"
+  ],
+  "risks": [
+    "_resolve_type supports only six dtype names and silently maps any other name to string."
+  ],
+  "open_questions": [
+    "Should an unknown dtype name in CsvSpec.dtypes raise instead of falling back to string?"
+  ],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/formats/csv.py",
+      "detail": "CsvSpec dataclass"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/advanced-usage.md",
+      "detail": "Format options"
+    },
+    {
+      "kind": "example",
+      "path": "examples/format_options/example.py",
+      "detail": "semicolon-delimited CsvSpec"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

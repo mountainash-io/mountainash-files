@@ -1,0 +1,59 @@
+{
+  "id": "mountainash_files.formats._engines",
+  "path": "src/mountainash_files/formats/_engines.py",
+  "summary": "Shared helpers for engine-based readers: copies bytes into Arrow-owned buffers, converts large and view types back to standard Arrow types when 32-bit offsets fit, and infers ISO date and datetime columns with the same results as the pyarrow CSV reader.",
+  "role": "io",
+  "visibility": "private",
+  "stability": "stable",
+  "audiences": [
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "internal-note",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [
+    "native_buffer",
+    "normalise_types",
+    "infer_temporal"
+  ],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.xlsx"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Output type normalisation across engines (polars, calamine, pyarrow)"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_engines.py",
+    "tests/test_parquet.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "doc",
+      "path": "docs/migration-reader-engines.md",
+      "detail": "Output types section"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_engines.py",
+      "detail": "type normalisation and temporal inference"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "mountainash_files.specs.archive",
+  "path": "src/mountainash_files/specs/archive.py",
+  "summary": "Archive specs: GzipCompression and ZipArchive (member pattern, sort order, password, inner gzip, how to handle unrecognised members), each with positive decompressed-size and member-count limits that are validated on construction.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [
+    "GzipCompression",
+    "ZipArchive"
+  ],
+  "key_classes": [
+    "GzipCompression",
+    "ZipArchive"
+  ],
+  "key_functions": [
+    "require_positive_limits"
+  ],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files.specs.base",
+    "mountainash_files._archives",
+    "mountainash_files.formats.xlsx"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Reading ZIP members",
+    "Decompression limits"
+  ],
+  "examples": [
+    "examples/zip_archives/example.py"
+  ],
+  "tests": [
+    "tests/test_archives.py",
+    "tests/test_specs.py",
+    "tests/test_parse.py"
+  ],
+  "risks": [],
+  "open_questions": [
+    "ZipArchive.password is typed str | None but _unpack_zip also accepts secret-like objects (get_secret_value / resolve). Should the type say so?"
+  ],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "GzipCompression, ZipArchive re-exported"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

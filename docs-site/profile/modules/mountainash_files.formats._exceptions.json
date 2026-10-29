@@ -1,0 +1,76 @@
+{
+  "id": "mountainash_files.formats._exceptions",
+  "path": "src/mountainash_files/formats/_exceptions.py",
+  "summary": "Format error hierarchy: FormatError, UnknownFormatError (carries the known suffixes and any failed plugins), ParseError (carries the format key), FormatConflictError, FormatResolutionError and SchemaDiscoveryUnsupportedError.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [
+    "FormatError",
+    "UnknownFormatError",
+    "ParseError",
+    "FormatConflictError",
+    "FormatResolutionError",
+    "SchemaDiscoveryUnsupportedError"
+  ],
+  "key_classes": [
+    "FormatError",
+    "UnknownFormatError",
+    "ParseError",
+    "FormatConflictError",
+    "FormatResolutionError",
+    "SchemaDiscoveryUnsupportedError"
+  ],
+  "key_functions": [],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._delimited",
+    "mountainash_files.formats._rows",
+    "mountainash_files.formats._xlsx_calamine",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.xlsx",
+    "mountainash_files.formats.xml"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Error reference: format errors and remediation hints"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_exceptions.py",
+    "tests/test_entrypoint_discovery.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "errors re-exported"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_exceptions.py",
+      "detail": "error messages and attributes"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

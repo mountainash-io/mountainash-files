@@ -1,0 +1,57 @@
+{
+  "id": "mountainash_files.specs.sink",
+  "path": "src/mountainash_files/specs/sink.py",
+  "summary": "FileSinkSpec: write-side FileSpec that adds write_disposition (replace or append) and create_path.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "FileSinkSpec"
+  ],
+  "key_classes": [
+    "FileSinkSpec"
+  ],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files.specs.base"
+  ],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Write modes"
+  ],
+  "examples": [
+    "examples/format_conversion/example.py",
+    "examples/parquet_append/example.py"
+  ],
+  "tests": [
+    "tests/test_sink_spec.py",
+    "tests/test_write.py",
+    "tests/test_copy.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "FileSinkSpec re-exported"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

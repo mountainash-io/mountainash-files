@@ -1,0 +1,153 @@
+{
+  "audience": "users",
+  "summary": "Users want to parse, inspect and write structured files with one API, whatever the format or storage location, and to tune format options without learning each engine.",
+  "concepts": [
+    {
+      "name": "File specs: where, what format, which storage",
+      "module_ids": [
+        "mountainash_files.specs.base",
+        "mountainash_files.specs.source",
+        "mountainash_files.specs.sink"
+      ],
+      "recommended_docs": [
+        "guide",
+        "reference"
+      ],
+      "evidence": [
+        "docs/advanced-usage.md",
+        "examples/local_files/example.py"
+      ]
+    },
+    {
+      "name": "Parse, write, copy and stream",
+      "module_ids": [
+        "mountainash_files",
+        "mountainash_files._operations"
+      ],
+      "recommended_docs": [
+        "quickstart",
+        "guide"
+      ],
+      "evidence": [
+        "README.md",
+        "examples/format_conversion/example.py"
+      ]
+    },
+    {
+      "name": "In-memory buffers",
+      "module_ids": [
+        "mountainash_files._operations"
+      ],
+      "recommended_docs": [
+        "recipe"
+      ],
+      "evidence": [
+        "examples/in_memory/example.py"
+      ]
+    },
+    {
+      "name": "Format options",
+      "module_ids": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats.tsv",
+        "mountainash_files.formats.json",
+        "mountainash_files.formats.parquet",
+        "mountainash_files.formats.xlsx",
+        "mountainash_files.formats.xml",
+        "mountainash_files.formats._types"
+      ],
+      "recommended_docs": [
+        "reference"
+      ],
+      "evidence": [
+        "examples/format_options/example.py",
+        "docs/advanced-usage.md"
+      ]
+    },
+    {
+      "name": "Schema discovery",
+      "module_ids": [
+        "mountainash_files._operations",
+        "mountainash_files.formats.parquet",
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats.json"
+      ],
+      "recommended_docs": [
+        "guide"
+      ],
+      "evidence": [
+        "docs/advanced-usage.md"
+      ]
+    },
+    {
+      "name": "Globs, templates, archives and missing files",
+      "module_ids": [
+        "mountainash_files.specs.source",
+        "mountainash_files.specs.archive"
+      ],
+      "recommended_docs": [
+        "guide",
+        "recipe"
+      ],
+      "evidence": [
+        "examples/globs_and_templates/example.py",
+        "examples/zip_archives/example.py"
+      ]
+    },
+    {
+      "name": "Errors and remediation",
+      "module_ids": [
+        "mountainash_files._exceptions",
+        "mountainash_files.formats._exceptions"
+      ],
+      "recommended_docs": [
+        "reference"
+      ],
+      "evidence": [
+        "tests/test_exceptions.py"
+      ]
+    },
+    {
+      "name": "Custom formats",
+      "module_ids": [
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats._protocols"
+      ],
+      "recommended_docs": [
+        "guide"
+      ],
+      "evidence": [
+        "docs/advanced-usage.md"
+      ]
+    }
+  ],
+  "featured_modules": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.specs.source",
+    "mountainash_files.specs.sink",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet"
+  ],
+  "hidden_or_internal_modules": [
+    "mountainash_files.formats._delimited",
+    "mountainash_files.formats._rows",
+    "mountainash_files.formats._engines",
+    "mountainash_files.formats._xlsx_calamine",
+    "mountainash_files._glob",
+    "mountainash_files._archives"
+  ],
+  "documentation_plan": [
+    "Quick start: parse CSV, write Parquet",
+    "File specs guide",
+    "Format options reference per format",
+    "Schema discovery guide",
+    "Selecting files: templates, globs, ZIP members",
+    "Error reference",
+    "Custom formats walkthrough"
+  ],
+  "open_questions": [
+    "The archive exceptions are not exported from the package root, so users cannot catch ArchiveLimitError without a private import."
+  ]
+}

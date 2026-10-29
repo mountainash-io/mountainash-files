@@ -1,0 +1,55 @@
+{
+  "id": "mountainash_files.formats.tsv",
+  "path": "src/mountainash_files/formats/tsv.py",
+  "summary": "TSV format: TsvSpec subclasses CsvSpec with a tab delimiter and .tsv/.tab suffixes, and reuses the CSV parser, inspector and serialiser.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "backend-architecture"
+  ],
+  "doc_priority": "reference-only",
+  "confidence": "high",
+  "public_api": [
+    "TsvSpec"
+  ],
+  "key_classes": [
+    "TsvSpec"
+  ],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats.csv"
+  ],
+  "dependents": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "TSV as a CsvSpec specialisation"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_tsv.py",
+    "tests/test_csv.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/formats/tsv.py",
+      "detail": "class TsvSpec(CsvSpec)"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

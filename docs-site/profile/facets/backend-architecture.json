@@ -1,0 +1,114 @@
+{
+  "audience": "backend-architecture",
+  "summary": "This lens covers the format plug-in architecture (spec, parser, serialiser, inspector and access mode registered by key, suffix and media type), the transport delegation boundary, and how each built-in format maps to its engine.",
+  "concepts": [
+    {
+      "name": "Format contract",
+      "module_ids": [
+        "mountainash_files.formats._types",
+        "mountainash_files.formats._protocols",
+        "mountainash_files.formats._registry"
+      ],
+      "recommended_docs": [
+        "architecture",
+        "extension guide"
+      ],
+      "evidence": [
+        "tests/test_format_spec_contract.py",
+        "tests/test_protocols.py"
+      ]
+    },
+    {
+      "name": "Resolution precedence: explicit, media type, suffix",
+      "module_ids": [
+        "mountainash_files.formats._registry"
+      ],
+      "recommended_docs": [
+        "reference"
+      ],
+      "evidence": [
+        "src/mountainash_files/formats/_registry.py"
+      ]
+    },
+    {
+      "name": "Access modes: bytes, random, sequential",
+      "module_ids": [
+        "mountainash_files._operations",
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats.parquet",
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats.json"
+      ],
+      "recommended_docs": [
+        "architecture"
+      ],
+      "evidence": [
+        "tests/test_access_routing.py",
+        "docs/migration-reader-engines.md"
+      ]
+    },
+    {
+      "name": "Engines per format",
+      "module_ids": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats.json",
+        "mountainash_files.formats.parquet",
+        "mountainash_files.formats.xlsx",
+        "mountainash_files.formats._xlsx_calamine",
+        "mountainash_files.formats.xml",
+        "mountainash_files.formats._engines"
+      ],
+      "recommended_docs": [
+        "support matrix"
+      ],
+      "evidence": [
+        "docs/migration-reader-engines.md"
+      ]
+    },
+    {
+      "name": "Plugin discovery via entry points",
+      "module_ids": [
+        "mountainash_files.formats",
+        "mountainash_files.formats._registry"
+      ],
+      "recommended_docs": [
+        "extension guide"
+      ],
+      "evidence": [
+        "tests/test_entrypoint_discovery.py"
+      ]
+    },
+    {
+      "name": "Transport delegation",
+      "module_ids": [
+        "mountainash_files._operations",
+        "mountainash_files._glob",
+        "mountainash_files.specs.base"
+      ],
+      "recommended_docs": [
+        "architecture"
+      ],
+      "evidence": [
+        "pyproject.toml",
+        "docs/profiles.md"
+      ]
+    }
+  ],
+  "featured_modules": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types",
+    "mountainash_files.formats._protocols",
+    "mountainash_files._operations",
+    "mountainash_files.formats.parquet"
+  ],
+  "hidden_or_internal_modules": [],
+  "documentation_plan": [
+    "Format support matrix (parse / write / schema / append / access mode)",
+    "Writing a format plugin",
+    "Access-mode routing diagram",
+    "Transport boundary diagram"
+  ],
+  "open_questions": [
+    "Should the registry getters become public so extension authors can introspect registered formats?"
+  ]
+}

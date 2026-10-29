@@ -1,0 +1,61 @@
+{
+  "id": "mountainash_files.formats._delimited",
+  "path": "src/mountainash_files/formats/_delimited.py",
+  "summary": "Quote- and escape-aware lexer for delimited text. Handles logical record splitting, comment-record removal and field tokenisation, and encodes each field in the first form that cannot be misread in its position, working right to left through the record.",
+  "role": "io",
+  "visibility": "private",
+  "stability": "stable",
+  "audiences": [
+    "maintainers"
+  ],
+  "doc_priority": "internal-note",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [
+    "iter_logical_records",
+    "tokenize_record",
+    "tokenize_record_quoted",
+    "remove_comment_records",
+    "encode_record",
+    "encode_field",
+    "_lex",
+    "_validate_delimited_spec"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._exceptions"
+  ],
+  "dependents": [
+    "mountainash_files.formats.csv"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Maintainer note: CSV lexer path vs native pyarrow path"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_csv.py",
+    "tests/test_tsv.py",
+    "tests/test_serialise_formats.py"
+  ],
+  "risks": [
+    "The lexer is a pure-Python character loop and is the slow path for large non-native CSV input.",
+    "The CSV tests exercise it only through csv_parse and csv_serialise; it has no direct unit tests."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/formats/csv.py",
+      "detail": "imports lexer and encoder functions"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

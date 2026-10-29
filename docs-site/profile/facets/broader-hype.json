@@ -1,0 +1,58 @@
+{
+  "audience": "broader-hype",
+  "summary": "One API for six formats on local disk or any storage transport supports. Remote Parquet reads only the columns you select, schema discovery returns no rows, and untrusted archives cannot exhaust memory.",
+  "concepts": [
+    {
+      "name": "One API, many formats and places",
+      "module_ids": [
+        "mountainash_files",
+        "mountainash_files._operations"
+      ],
+      "recommended_docs": [
+        "landing page"
+      ],
+      "evidence": [
+        "README.md",
+        "examples/format_conversion/example.py"
+      ]
+    },
+    {
+      "name": "Read only the columns you need from remote Parquet",
+      "module_ids": [
+        "mountainash_files.formats.parquet"
+      ],
+      "recommended_docs": [
+        "blog/demo"
+      ],
+      "evidence": [
+        "docs/migration-reader-engines.md",
+        "tests/test_access_routing.py"
+      ]
+    },
+    {
+      "name": "Schema without loading data",
+      "module_ids": [
+        "mountainash_files._operations"
+      ],
+      "recommended_docs": [
+        "demo"
+      ],
+      "evidence": [
+        "docs/advanced-usage.md"
+      ]
+    }
+  ],
+  "featured_modules": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.formats.parquet"
+  ],
+  "hidden_or_internal_modules": [],
+  "documentation_plan": [
+    "Before/after: convert CSV to Parquet in two calls",
+    "Remote Parquet projection demo"
+  ],
+  "open_questions": [
+    "The package is an unpublished 0.1.0 candidate, so public positioning should wait for the release."
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "id": "mountainash_files.specs.base",
+  "path": "src/mountainash_files/specs/base.py",
+  "summary": "FileSpec: a frozen description of a file, with path, format (key or spec), storage profile (object, name or None), auth profile, archive, transform pipeline and location policy.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "FileSpec"
+  ],
+  "key_classes": [
+    "FileSpec"
+  ],
+  "key_functions": [],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files.specs.sink",
+    "mountainash_files.specs.source",
+    "mountainash_files._operations"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "A string storage_profile is resolved through mountainash_transport.resolve_storage; an explicit auth_profile always wins over the resolved one."
+  ],
+  "documentation_hooks": [
+    "File specs and format selection",
+    "Storage and auth profile resolution"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_specs.py",
+    "tests/test_sink_spec.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "doc",
+      "path": "docs/advanced-usage.md",
+      "detail": "File specs and format selection"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/profiles.md",
+      "detail": "Named profiles"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

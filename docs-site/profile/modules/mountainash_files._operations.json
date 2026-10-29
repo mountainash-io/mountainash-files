@@ -1,0 +1,133 @@
+{
+  "id": "mountainash_files._operations",
+  "path": "src/mountainash_files/_operations.py",
+  "summary": "Implements the eight file operations: parse, inspect_schema, write, copy, stream, parse_bytes, inspect_schema_bytes and serialise_bytes. It resolves path templates, globs, archives, storage and auth profiles, location policy and transform pipelines, routes each read to a byte, random-access or sequential transport handle, normalises tabular output and checks append schemas.",
+  "role": "orchestration",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture",
+    "broader-hype"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "parse",
+    "inspect_schema",
+    "write",
+    "copy",
+    "stream",
+    "parse_bytes",
+    "inspect_schema_bytes",
+    "serialise_bytes"
+  ],
+  "key_classes": [],
+  "key_functions": [
+    "parse",
+    "inspect_schema",
+    "write",
+    "copy",
+    "stream",
+    "parse_bytes",
+    "inspect_schema_bytes",
+    "serialise_bytes",
+    "_read_source",
+    "_with_access",
+    "_normalise_output",
+    "_resolve_profiles",
+    "_merge_append_tables",
+    "_no_transforms"
+  ],
+  "dependencies": [
+    "mountainash_files._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._types",
+    "mountainash_files.specs.base",
+    "mountainash_files.specs.sink",
+    "mountainash_files.specs.source",
+    "mountainash_files._glob",
+    "mountainash_files._archives",
+    "mountainash_files.formats.parquet"
+  ],
+  "dependents": [
+    "mountainash_files"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "Formats resolve before any I/O, so an unknown suffix raises without touching storage.",
+    "A source with a glob expands into one child source per matched path and recurses with glob=None.",
+    "Archive reads disable suffix inference unless source.infer is set, then extract members and resolve each member's format separately.",
+    "Append reads the destination, requires identical ordered names and types, unions nullability, keeps the destination's metadata and rewrites the whole object.",
+    "_with_access falls back to whole-object bytes when transforms apply or the backend refuses ranged or streamed access."
+  ],
+  "documentation_hooks": [
+    "Operations and results reference",
+    "Read path: template, glob, archive, format, access mode",
+    "Write modes: replace and append",
+    "Schema discovery: metadata, full and bounded bases",
+    "Output seam: arrow vs pydata"
+  ],
+  "examples": [
+    "examples/local_files/example.py",
+    "examples/format_conversion/example.py",
+    "examples/byte_operations/example.py",
+    "examples/in_memory/example.py",
+    "examples/parquet_append/example.py",
+    "examples/globs_and_templates/example.py",
+    "examples/named_profiles/example.py",
+    "examples/gzip_pipeline/example.py"
+  ],
+  "tests": [
+    "tests/test_parse.py",
+    "tests/test_write.py",
+    "tests/test_copy.py",
+    "tests/test_stream.py",
+    "tests/test_params.py",
+    "tests/test_parse_glob.py",
+    "tests/test_schema_discovery.py",
+    "tests/test_schema_sources.py",
+    "tests/test_access_routing.py",
+    "tests/test_output_normalisation.py",
+    "tests/test_location_policy.py",
+    "tests/test_serialisers.py",
+    "tests/test_specs.py"
+  ],
+  "risks": [
+    "Append rewrites the whole object: cost grows with the destination size, and nothing coordinates concurrent appends.",
+    "_normalise_output is the single tabular-normalisation seam. Changing it affects every format's output= behaviour.",
+    "_read_source carries archive, glob and non-archive branches in one function, so the three paths can drift apart."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/_operations.py",
+      "detail": "def parse / inspect_schema / write / copy / stream"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/advanced-usage.md",
+      "detail": "Operations and results; Write modes; Globs, archives and missing files"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_access_routing.py",
+      "detail": "random vs bytes acquisition routing"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_location_policy.py",
+      "detail": "location policy passed to every facade"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

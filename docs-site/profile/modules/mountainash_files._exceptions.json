@@ -1,0 +1,64 @@
+{
+  "id": "mountainash_files._exceptions",
+  "path": "src/mountainash_files/_exceptions.py",
+  "summary": "Defines the operation-level errors: WriteError, AppendSchemaMismatchError (which carries the expected and actual Arrow schemas) and MissingDependencyError (which names the extra to install).",
+  "role": "model",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "maintainers"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [
+    "WriteError",
+    "AppendSchemaMismatchError",
+    "MissingDependencyError"
+  ],
+  "key_classes": [
+    "WriteError",
+    "AppendSchemaMismatchError",
+    "MissingDependencyError"
+  ],
+  "key_functions": [],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.xlsx"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Error reference: write and dependency errors"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_write.py",
+    "tests/test_sink_spec.py",
+    "tests/test_exceptions.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "re-exported in __all__"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_write.py",
+      "detail": "append schema mismatch raised"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}
