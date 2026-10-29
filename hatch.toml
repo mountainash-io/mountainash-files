@@ -16,7 +16,6 @@ include = ["/src", "/tests", "/tests_optional", "/tools", "/docs", "/examples", 
 [envs.build_github]
 python = "3.12"
 installer = "uv"
-features = ["http"]
 # Hatch installs the project before syncing environment dependencies.
 dependencies = [
     "cyclonedx-bom==4.5.0",
