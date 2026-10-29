@@ -1,0 +1,80 @@
+{
+  "id": "mountainash_files._archives",
+  "path": "src/mountainash_files/_archives.py",
+  "summary": "Extracts gzip and ZIP archive members under decompression budgets. Also provides check_zip_container, which bounds an untrusted ZIP container's actual inflated size and member count, and rejects ambiguous directories, before a third-party reader opens it.",
+  "role": "io",
+  "visibility": "internal",
+  "stability": "evolving",
+  "audiences": [
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [
+    "ArchiveExtractionError",
+    "ArchiveEmptyMatchError",
+    "ArchiveLimitError",
+    "_Budget"
+  ],
+  "key_functions": [
+    "unpack_archive",
+    "check_zip_container",
+    "_declared_entries",
+    "_inflating_reader"
+  ],
+  "dependencies": [
+    "mountainash_files.specs.archive"
+  ],
+  "dependents": [
+    "mountainash_files._operations",
+    "mountainash_files.formats.xlsx"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "Hardening against zip bombs and directory forgery; the ZIP check is shared with the XLSX reader."
+  ],
+  "documentation_hooks": [
+    "Security note: decompression limits and zip-bomb defence",
+    "Archive member selection: file_pattern, sort_order, on_unrecognised"
+  ],
+  "examples": [
+    "examples/zip_archives/example.py"
+  ],
+  "tests": [
+    "tests/test_archives.py",
+    "tests/test_xlsx_limits.py"
+  ],
+  "risks": [
+    "Security-sensitive parser of untrusted binary structure; each guard in _declared_entries closes a reader-disagreement bypass.",
+    "unpack_archive returns complete members in memory; the budget bounds total size but there is no per-member streaming."
+  ],
+  "open_questions": [
+    "The archive exception classes are not exported from the package root, so callers cannot catch them without a private import."
+  ],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/_archives.py",
+      "detail": "check_zip_container / ArchiveLimitError"
+    },
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/formats/xlsx.py",
+      "detail": "XLSX container check uses check_zip_container"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_archives.py",
+      "detail": "archive extraction and limits"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

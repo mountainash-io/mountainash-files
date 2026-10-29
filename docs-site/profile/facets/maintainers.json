@@ -1,0 +1,124 @@
+{
+  "audience": "maintainers",
+  "summary": "Maintainers need the invariants: formats resolve before I/O, storage goes only through transport, importing the package stays lazy, one output seam normalises tabular data, append is schema-checked, and archives and workbooks are bounded.",
+  "concepts": [
+    {
+      "name": "Read pipeline and access routing",
+      "module_ids": [
+        "mountainash_files._operations",
+        "mountainash_files._glob",
+        "mountainash_files._archives"
+      ],
+      "recommended_docs": [
+        "architecture"
+      ],
+      "evidence": [
+        "tests/test_access_routing.py",
+        "tests/test_schema_sources.py"
+      ]
+    },
+    {
+      "name": "Registry and registration bootstrap",
+      "module_ids": [
+        "mountainash_files.formats._registry",
+        "mountainash_files.formats"
+      ],
+      "recommended_docs": [
+        "architecture"
+      ],
+      "evidence": [
+        "tests/test_registry.py",
+        "tests/test_entrypoint_discovery.py"
+      ]
+    },
+    {
+      "name": "Storage boundary",
+      "module_ids": [
+        "mountainash_files._operations",
+        "mountainash_files._glob"
+      ],
+      "recommended_docs": [
+        "principles"
+      ],
+      "evidence": [
+        "pyproject.toml"
+      ]
+    },
+    {
+      "name": "Engine type normalisation",
+      "module_ids": [
+        "mountainash_files.formats._engines",
+        "mountainash_files.formats.json",
+        "mountainash_files.formats._xlsx_calamine"
+      ],
+      "recommended_docs": [
+        "architecture"
+      ],
+      "evidence": [
+        "docs/migration-reader-engines.md",
+        "tests/test_engines.py"
+      ]
+    },
+    {
+      "name": "CSV fast path vs lexer",
+      "module_ids": [
+        "mountainash_files.formats.csv",
+        "mountainash_files.formats._delimited",
+        "mountainash_files.formats._rows"
+      ],
+      "recommended_docs": [
+        "internals"
+      ],
+      "evidence": [
+        "tests/test_csv.py"
+      ]
+    },
+    {
+      "name": "Decompression safety",
+      "module_ids": [
+        "mountainash_files._archives",
+        "mountainash_files.specs.archive",
+        "mountainash_files.formats.xlsx"
+      ],
+      "recommended_docs": [
+        "security"
+      ],
+      "evidence": [
+        "tests/test_archives.py",
+        "tests/test_xlsx_limits.py"
+      ]
+    },
+    {
+      "name": "Packaging and release invariants",
+      "module_ids": [
+        "mountainash_files",
+        "mountainash_files.__version__"
+      ],
+      "recommended_docs": [
+        "contributing"
+      ],
+      "evidence": [
+        "tests/test_lazy_imports.py",
+        "tests/test_install_contract.py",
+        "RELEASE.md"
+      ]
+    }
+  ],
+  "featured_modules": [
+    "mountainash_files._operations",
+    "mountainash_files.formats._registry",
+    "mountainash_files._archives",
+    "mountainash_files.formats.csv"
+  ],
+  "hidden_or_internal_modules": [],
+  "documentation_plan": [
+    "Architecture overview: operations, registry, formats, specs",
+    "Storage-boundary principle and its ruff enforcement",
+    "Archive and XLSX hardening notes",
+    "CSV internals",
+    "Release and versioning"
+  ],
+  "open_questions": [
+    "_register_builtin_formats repeats the registration arguments from each format module. Should one source of truth replace the copies?"
+  ]
+}

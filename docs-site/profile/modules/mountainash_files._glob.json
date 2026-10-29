@@ -1,0 +1,61 @@
+{
+  "id": "mountainash_files._glob",
+  "path": "src/mountainash_files/_glob.py",
+  "summary": "Resolves glob patterns through transport's list_objects, using one matching rule on every backend: *, ? and [...] match within a path segment, and ** matches zero or more segments.",
+  "role": "io",
+  "visibility": "internal",
+  "stability": "stable",
+  "audiences": [
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [
+    "resolve_glob",
+    "_matches"
+  ],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files._operations"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "The ruff banned-api config forbids the stdlib glob module and routes all globbing here."
+  ],
+  "documentation_hooks": [
+    "Glob semantics across local and object-store backends"
+  ],
+  "examples": [
+    "examples/globs_and_templates/example.py"
+  ],
+  "tests": [
+    "tests/test_glob.py",
+    "tests/test_parse_glob.py"
+  ],
+  "risks": [
+    "Deriving the root from the first listed entry assumes every backend renders paths consistently."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "config",
+      "path": "pyproject.toml",
+      "detail": "\"glob\".msg = use mountainash_files._glob, which lists through transport"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_glob.py",
+      "detail": "segment and ** matching"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

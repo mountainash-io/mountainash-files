@@ -1,0 +1,55 @@
+{
+  "id": "mountainash_files.formats._xlsx_calamine",
+  "path": "src/mountainash_files/formats/_xlsx_calamine.py",
+  "summary": "Reads a sheet through fastexcel (calamine) in contiguous runs of data rows, so comment and header rows are left out of type inference. It restores leading empty columns, merges column types across runs, reads header labels with openpyxl and turns integral floats back into int64.",
+  "role": "backend",
+  "visibility": "private",
+  "stability": "evolving",
+  "audiences": [
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "internal-note",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [
+    "read_calamine",
+    "_runs",
+    "_merge_type",
+    "_recover_ints",
+    "_header_cells"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._exceptions"
+  ],
+  "dependents": [
+    "mountainash_files.formats.xlsx"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [],
+  "examples": [],
+  "tests": [
+    "tests/test_xlsx_engines.py",
+    "tests_optional/xlsx/test_xlsx.py"
+  ],
+  "risks": [
+    "Opens the workbook with two engines, calamine for data and openpyxl for header cells, which costs two parses of the workbook."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/formats/xlsx.py",
+      "detail": "read_calamine"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

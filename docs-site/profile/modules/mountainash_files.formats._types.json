@@ -1,0 +1,83 @@
+{
+  "id": "mountainash_files.formats._types",
+  "path": "src/mountainash_files/formats/_types.py",
+  "summary": "Defines the FormatSpec base, whose class attributes FORMAT, SUFFIXES, MEDIATYPES, TABULAR, APPENDABLE and COMPLEX_HANDLER_KEY describe a format, with to_options/from_options round-tripping through JSON. Also defines the ParseResult and SchemaResult result wrappers.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "FormatSpec",
+    "ParseResult",
+    "SchemaResult"
+  ],
+  "key_classes": [
+    "FormatSpec",
+    "ParseResult",
+    "SchemaResult"
+  ],
+  "key_functions": [
+    "FormatSpec.to_options",
+    "FormatSpec.from_options"
+  ],
+  "dependencies": [],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations",
+    "mountainash_files.formats._protocols",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats.csv",
+    "mountainash_files.formats.json",
+    "mountainash_files.formats.parquet",
+    "mountainash_files.formats.xlsx",
+    "mountainash_files.formats.xml"
+  ],
+  "extension_points": [
+    "Subclass FormatSpec as a frozen dataclass to define a format's options",
+    "COMPLEX_HANDLER_KEY advertises a treespec-owned complex-format handler linkage; treespec's handler registry is the authority"
+  ],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Format spec contract",
+    "Serialising format options (to_options / from_options)",
+    "Result types"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_format_spec_contract.py",
+    "tests/test_parse.py",
+    "tests/test_registry.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "FormatSpec, ParseResult, SchemaResult re-exported"
+    },
+    {
+      "kind": "doc",
+      "path": "README.md",
+      "detail": "COMPLEX_HANDLER_KEY: see mountainash-central 2026-07-05 arrow-output design §1.4 (treespec seam)"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_format_spec_contract.py",
+      "detail": "spec option round-trip contract"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

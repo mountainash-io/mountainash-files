@@ -1,0 +1,50 @@
+{
+  "id": "mountainash_files.formats._rows",
+  "path": "src/mountainash_files/formats/_rows.py",
+  "summary": "Applies a header plan to tabular rows: picks out header rows, joins multi-row header labels, generates fieldN labels when there is no header, and rejects inconsistent row widths and duplicate labels.",
+  "role": "io",
+  "visibility": "private",
+  "stability": "stable",
+  "audiences": [
+    "maintainers"
+  ],
+  "doc_priority": "internal-note",
+  "confidence": "high",
+  "public_api": [],
+  "key_classes": [],
+  "key_functions": [
+    "apply_header_plan"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._exceptions"
+  ],
+  "dependents": [
+    "mountainash_files.formats.csv"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [],
+  "examples": [],
+  "tests": [
+    "tests/test_csv.py",
+    "tests/test_tsv.py"
+  ],
+  "risks": [
+    "Raises ParseError with format key 'csv' even when parsing TSV, so TSV errors name the wrong format."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/formats/csv.py",
+      "detail": "apply_header_plan used by csv_parse and _header"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

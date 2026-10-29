@@ -1,0 +1,118 @@
+{
+  "id": "mountainash_files",
+  "path": "src/mountainash_files/__init__.py",
+  "summary": "Package root. Re-exports the eight file operations, register_format, file and format specs, archive specs, protocols and the error hierarchy, then imports mountainash_files.formats to register the built-in formats.",
+  "role": "public-api",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture",
+    "broader-hype"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "copy",
+    "parse",
+    "parse_bytes",
+    "inspect_schema",
+    "inspect_schema_bytes",
+    "serialise_bytes",
+    "stream",
+    "write",
+    "register_format",
+    "FileSpec",
+    "FileSinkSpec",
+    "FileSourceSpec",
+    "FormatSpec",
+    "ParseResult",
+    "SchemaResult",
+    "GzipCompression",
+    "ZipArchive",
+    "FormatError",
+    "FormatParser",
+    "FormatSchemaInspector",
+    "FormatSerialiser",
+    "UnknownFormatError",
+    "ParseError",
+    "FormatConflictError",
+    "FormatResolutionError",
+    "SchemaDiscoveryUnsupportedError",
+    "WriteError",
+    "AppendSchemaMismatchError",
+    "MissingDependencyError"
+  ],
+  "key_classes": [],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files._exceptions",
+    "mountainash_files._operations",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._protocols",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types",
+    "mountainash_files.specs.archive",
+    "mountainash_files.specs.base",
+    "mountainash_files.specs.sink",
+    "mountainash_files.specs.source",
+    "mountainash_files.formats"
+  ],
+  "dependents": [],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "Importing the package registers the built-in formats and runs entry-point plugin discovery once, as a side effect.",
+    "Heavy libraries (pyarrow, polars and the optional engines) must not load at import time; tests/test_lazy_imports.py enforces this."
+  ],
+  "documentation_hooks": [
+    "Public API overview and import map",
+    "Quick start: parse a file, then write it in another format"
+  ],
+  "examples": [
+    "examples/local_files/example.py",
+    "examples/in_memory/example.py"
+  ],
+  "tests": [
+    "tests/test_lazy_imports.py",
+    "tests/test_install_contract.py",
+    "tests/test_cross_package.py",
+    "tests/typing/consumer.py"
+  ],
+  "risks": [
+    "Version 0.1.0 is an unpublished candidate (README Installation section), so the export list can still change."
+  ],
+  "open_questions": [
+    "__version__ is not re-exported from the package root, so mountainash_files.__version__ is unavailable. Is that intentional?",
+    "ArchiveExtractionError, ArchiveEmptyMatchError and ArchiveLimitError can reach callers but are not exported from the root. Should they be public?"
+  ],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "__all__ lists the public surface"
+    },
+    {
+      "kind": "import",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "import mountainash_files.formats triggers built-in registration"
+    },
+    {
+      "kind": "test",
+      "path": "tests/test_lazy_imports.py",
+      "detail": "packaging invariant: importing the package must not import heavy libs"
+    },
+    {
+      "kind": "doc",
+      "path": "README.md",
+      "detail": "'What it provides' table maps capability areas to the API"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "id": "mountainash_files.formats.xml",
+  "path": "src/mountainash_files/formats/xml.py",
+  "summary": "XML format: XmlSpec with an optional XPath and encoding. Non-tabular: the parser returns an element, or a list of elements when an XPath is given. Uses lxml when it is installed and falls back to the stdlib ElementTree.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users",
+    "backend-architecture"
+  ],
+  "doc_priority": "reference-only",
+  "confidence": "high",
+  "public_api": [
+    "XmlSpec"
+  ],
+  "key_classes": [
+    "XmlSpec"
+  ],
+  "key_functions": [
+    "xml_parse",
+    "xml_serialise"
+  ],
+  "dependencies": [
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types"
+  ],
+  "dependents": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "TABULAR=False, so the output seam passes the parsed object through unchanged."
+  ],
+  "documentation_hooks": [
+    "Non-tabular formats and the output seam"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_xml.py",
+    "tests/test_serialise_formats.py",
+    "tests_optional/xml/test_lxml.py"
+  ],
+  "risks": [
+    "The XPath result type differs by engine: lxml elements or stdlib ElementTree elements.",
+    "When lxml is installed but data is a stdlib element, xml_serialise falls through to ElementTree."
+  ],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "symbol",
+      "path": "src/mountainash_files/formats/xml.py",
+      "detail": "TABULAR = False"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

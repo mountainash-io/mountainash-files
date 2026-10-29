@@ -1,0 +1,137 @@
+{
+  "profile_version": "1.0",
+  "generated_at": "2026-10-29T07:00:55Z",
+  "source": {
+    "root": "src/mountainash_files",
+    "git": {
+      "previous_hash": null,
+      "current_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+      "branch": "docs/package-profile",
+      "working_tree_dirty": false
+    }
+  },
+  "scope": {
+    "include": [
+      "src/mountainash_files/**/*.py"
+    ],
+    "exclude": [],
+    "package_roots": [
+      "src/mountainash_files"
+    ]
+  },
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture",
+    "broader-hype"
+  ],
+  "counts": {
+    "modules_discovered": 26,
+    "modules_profiled": 25,
+    "profiles_ignored": 1,
+    "facets_written": 4
+  },
+  "changed_scopes": {
+    "files": [
+      "src/mountainash_files/__init__.py",
+      "src/mountainash_files/__version__.py",
+      "src/mountainash_files/_archives.py",
+      "src/mountainash_files/_exceptions.py",
+      "src/mountainash_files/_glob.py",
+      "src/mountainash_files/_operations.py",
+      "src/mountainash_files/formats/__init__.py",
+      "src/mountainash_files/formats/_delimited.py",
+      "src/mountainash_files/formats/_engines.py",
+      "src/mountainash_files/formats/_exceptions.py",
+      "src/mountainash_files/formats/_protocols.py",
+      "src/mountainash_files/formats/_registry.py",
+      "src/mountainash_files/formats/_rows.py",
+      "src/mountainash_files/formats/_types.py",
+      "src/mountainash_files/formats/_xlsx_calamine.py",
+      "src/mountainash_files/formats/csv.py",
+      "src/mountainash_files/formats/json.py",
+      "src/mountainash_files/formats/parquet.py",
+      "src/mountainash_files/formats/tsv.py",
+      "src/mountainash_files/formats/xlsx.py",
+      "src/mountainash_files/formats/xml.py",
+      "src/mountainash_files/specs/archive.py",
+      "src/mountainash_files/specs/base.py",
+      "src/mountainash_files/specs/sink.py",
+      "src/mountainash_files/specs/source.py"
+    ],
+    "modules": [
+      "mountainash_files",
+      "mountainash_files.__version__",
+      "mountainash_files._archives",
+      "mountainash_files._exceptions",
+      "mountainash_files._glob",
+      "mountainash_files._operations",
+      "mountainash_files.formats",
+      "mountainash_files.formats._delimited",
+      "mountainash_files.formats._engines",
+      "mountainash_files.formats._exceptions",
+      "mountainash_files.formats._protocols",
+      "mountainash_files.formats._registry",
+      "mountainash_files.formats._rows",
+      "mountainash_files.formats._types",
+      "mountainash_files.formats._xlsx_calamine",
+      "mountainash_files.formats.csv",
+      "mountainash_files.formats.json",
+      "mountainash_files.formats.parquet",
+      "mountainash_files.formats.tsv",
+      "mountainash_files.formats.xlsx",
+      "mountainash_files.formats.xml",
+      "mountainash_files.specs.archive",
+      "mountainash_files.specs.base",
+      "mountainash_files.specs.sink",
+      "mountainash_files.specs.source"
+    ],
+    "facets": [
+      "users",
+      "maintainers",
+      "backend-architecture",
+      "broader-hype"
+    ]
+  },
+  "ignored_paths": [
+    {
+      "path": "src/mountainash_files/specs/__init__.py",
+      "reason": "Pure re-export aggregator for specs.* with no behaviour; exports are recorded on the defining modules"
+    }
+  ],
+  "profile_files": {
+    "modules": {
+      "mountainash_files": "modules/mountainash_files.json",
+      "mountainash_files.__version__": "modules/mountainash_files.__version__.json",
+      "mountainash_files._archives": "modules/mountainash_files._archives.json",
+      "mountainash_files._exceptions": "modules/mountainash_files._exceptions.json",
+      "mountainash_files._glob": "modules/mountainash_files._glob.json",
+      "mountainash_files._operations": "modules/mountainash_files._operations.json",
+      "mountainash_files.formats": "modules/mountainash_files.formats.json",
+      "mountainash_files.formats._delimited": "modules/mountainash_files.formats._delimited.json",
+      "mountainash_files.formats._engines": "modules/mountainash_files.formats._engines.json",
+      "mountainash_files.formats._exceptions": "modules/mountainash_files.formats._exceptions.json",
+      "mountainash_files.formats._protocols": "modules/mountainash_files.formats._protocols.json",
+      "mountainash_files.formats._registry": "modules/mountainash_files.formats._registry.json",
+      "mountainash_files.formats._rows": "modules/mountainash_files.formats._rows.json",
+      "mountainash_files.formats._types": "modules/mountainash_files.formats._types.json",
+      "mountainash_files.formats._xlsx_calamine": "modules/mountainash_files.formats._xlsx_calamine.json",
+      "mountainash_files.formats.csv": "modules/mountainash_files.formats.csv.json",
+      "mountainash_files.formats.json": "modules/mountainash_files.formats.json.json",
+      "mountainash_files.formats.parquet": "modules/mountainash_files.formats.parquet.json",
+      "mountainash_files.formats.tsv": "modules/mountainash_files.formats.tsv.json",
+      "mountainash_files.formats.xlsx": "modules/mountainash_files.formats.xlsx.json",
+      "mountainash_files.formats.xml": "modules/mountainash_files.formats.xml.json",
+      "mountainash_files.specs.archive": "modules/mountainash_files.specs.archive.json",
+      "mountainash_files.specs.base": "modules/mountainash_files.specs.base.json",
+      "mountainash_files.specs.sink": "modules/mountainash_files.specs.sink.json",
+      "mountainash_files.specs.source": "modules/mountainash_files.specs.source.json"
+    },
+    "facets": {
+      "users": "facets/users.json",
+      "maintainers": "facets/maintainers.json",
+      "backend-architecture": "facets/backend-architecture.json",
+      "broader-hype": "facets/broader-hype.json"
+    }
+  }
+}

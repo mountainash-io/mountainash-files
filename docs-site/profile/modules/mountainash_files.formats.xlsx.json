@@ -1,0 +1,81 @@
+{
+  "id": "mountainash_files.formats.xlsx",
+  "path": "src/mountainash_files/formats/xlsx.py",
+  "summary": "Excel format (.xlsx/.xlsm/.xlsb/.ods): XlsxSpec with sheet selection, multi-row headers, comments, temporal handling, inference sample size and zip-bomb limits. The container is bounded before the engine sees it. Read-only: there is no serialiser.",
+  "role": "backend",
+  "visibility": "public",
+  "stability": "evolving",
+  "audiences": [
+    "users",
+    "maintainers",
+    "backend-architecture"
+  ],
+  "doc_priority": "useful",
+  "confidence": "high",
+  "public_api": [
+    "XlsxSpec"
+  ],
+  "key_classes": [
+    "XlsxSpec"
+  ],
+  "key_functions": [
+    "xlsx_parse",
+    "xlsx_inspect_schema",
+    "_check_container",
+    "_xlsx_table"
+  ],
+  "dependencies": [
+    "mountainash_files._archives",
+    "mountainash_files._exceptions",
+    "mountainash_files.formats._exceptions",
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats._types",
+    "mountainash_files.specs.archive",
+    "mountainash_files.formats._engines",
+    "mountainash_files.formats._xlsx_calamine"
+  ],
+  "dependents": [
+    "mountainash_files.formats._registry",
+    "mountainash_files.formats"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [
+    "Requires the [xlsx] extra (fastexcel, openpyxl); raises MissingDependencyError when it is missing."
+  ],
+  "documentation_hooks": [
+    "Excel reading: sheets, headers, limits",
+    "Why Excel is read-only"
+  ],
+  "examples": [],
+  "tests": [
+    "tests/test_xlsx_engines.py",
+    "tests/test_xlsx_limits.py",
+    "tests_optional/xlsx/test_xlsx.py",
+    "tests_optional/xlsx/test_xlsx_schema.py"
+  ],
+  "risks": [
+    "The workbook is read in full even for bounded schema inspection; the budget limits only the rows used for inference."
+  ],
+  "open_questions": [
+    "Is an XLSX writer planned? The pyproject [xlsx] extra already includes openpyxl, which can write workbooks."
+  ],
+  "evidence": [
+    {
+      "kind": "config",
+      "path": "pyproject.toml",
+      "detail": "xlsx extra: fastexcel, openpyxl"
+    },
+    {
+      "kind": "doc",
+      "path": "docs/migration-reader-engines.md",
+      "detail": "XLSX section"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}

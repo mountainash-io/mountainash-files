@@ -1,0 +1,60 @@
+{
+  "id": "mountainash_files.specs.source",
+  "path": "src/mountainash_files/specs/source.py",
+  "summary": "FileSourceSpec: read-side FileSpec that adds a glob, on_missing (skip or raise), the transform-inference policy and GPG/gzip transform options.",
+  "role": "model",
+  "visibility": "public",
+  "stability": "stable",
+  "audiences": [
+    "users"
+  ],
+  "doc_priority": "essential",
+  "confidence": "high",
+  "public_api": [
+    "FileSourceSpec"
+  ],
+  "key_classes": [
+    "FileSourceSpec"
+  ],
+  "key_functions": [],
+  "dependencies": [
+    "mountainash_files.specs.base"
+  ],
+  "dependents": [
+    "mountainash_files",
+    "mountainash_files._operations"
+  ],
+  "extension_points": [],
+  "lifecycle_notes": [],
+  "documentation_hooks": [
+    "Selecting files: globs, templates, missing files"
+  ],
+  "examples": [
+    "examples/local_files/example.py",
+    "examples/globs_and_templates/example.py",
+    "examples/gzip_pipeline/example.py"
+  ],
+  "tests": [
+    "tests/test_specs.py",
+    "tests/test_parse.py",
+    "tests/test_parse_glob.py",
+    "tests/test_stream.py",
+    "tests/test_copy.py"
+  ],
+  "risks": [],
+  "open_questions": [],
+  "evidence": [
+    {
+      "kind": "export",
+      "path": "src/mountainash_files/__init__.py",
+      "detail": "FileSourceSpec re-exported"
+    }
+  ],
+  "source_hash": "0ee86bccab95a29bf7521fbc5f35b85e3ab04db1",
+  "manual": {
+    "notes": "",
+    "editorial_status": "",
+    "owner": "",
+    "manual_summary": ""
+  }
+}
