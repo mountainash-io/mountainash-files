@@ -1,0 +1,9 @@
+{
+  "title": "mountainash-files Concept Graph",
+  "description": "Internal concept dependency graph for the mountainash-files book: file specs, operations, the format registry and built-in formats, file selection and archives, storage and transforms, schema discovery, writing, errors, extension and internals.",
+  "creator": "Nathaniel Ramm",
+  "date": "2026-10-29",
+  "version": "1.0",
+  "format": "Learning Graph JSON v1.0",
+  "license": "Apache-2.0"
+}

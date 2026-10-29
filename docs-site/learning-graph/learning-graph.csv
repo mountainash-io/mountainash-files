@@ -1,0 +1,121 @@
+ConceptID,ConceptLabel,Dependencies,TaxonomyID
+1,Structured File,,FOUND
+2,Arrow Table,,FOUND
+3,Python Records,,FOUND
+4,Tabular vs Non-Tabular Data,2|3,FOUND
+5,Storage Location,1,FOUND
+6,Optional Extras,,FOUND
+7,mountainash-transport,5,FOUND
+8,FileSpec,1|5,SPEC
+9,FileSourceSpec,8,SPEC
+10,FileSinkSpec,8,SPEC
+11,Spec Format Field,8|14,SPEC
+12,Immutable Specs,8,SPEC
+13,Format Key,1,FMT
+14,FormatSpec,13,FMT
+15,Suffix Detection,13|5,FMT
+16,Media Type Detection,13,FMT
+17,Format Resolution Precedence,13|15|16,FMT
+18,Transform Suffixes Skipped,15,FMT
+19,Suffix Overrides,15|14,FMT
+20,Format Options Round-Trip,14,FMT
+21,Format Capability Flags,14|4,FMT
+22,parse,9|17|23,OPS
+23,ParseResult,2|14,OPS
+24,Output Mode (arrow vs pydata),22|4|2|3,OPS
+25,parse_bytes,22|14,OPS
+26,write,10|17,OPS
+27,serialise_bytes,26|14,OPS
+28,copy,9|10,OPS
+29,stream,9|7,OPS
+30,Path Templates,22,SEL
+31,Glob Patterns,9|7,SEL
+32,Glob Segment Semantics,31,SEL
+33,Missing Files (on_missing),9,SEL
+34,ZipArchive,9,SEL
+35,ZIP Member Selection,34,SEL
+36,Unrecognised Archive Members,34|17,SEL
+37,GzipCompression,9,SEL
+38,Decompression Limits,34|37,SEL
+39,Skipped Members in Results,36|23,SEL
+40,Storage Profile,7|8,STOR
+41,Named Storage Profiles,40,STOR
+42,Auth Profile,40,STOR
+43,Location Policy,8|7,STOR
+44,Transform Pipeline,7|8,STOR
+45,Transform Inference (infer),44|18,STOR
+46,Gzip Transform,44,STOR
+47,GPG Encryption Transform,44|6,STOR
+48,Stream Access Modes,29|7,STOR
+49,Range Policy,48,STOR
+50,Remote URL Sources,40|6,STOR
+51,CsvSpec,14,DELIM
+52,Delimiter and Quoting Options,51,DELIM
+53,Null Sequence,51,DELIM
+54,Multi-Row Headers,51,DELIM
+55,Comment Rows,51,DELIM
+56,CSV Column Selection,51|2,DELIM
+57,CSV dtypes Overrides,51|2,DELIM
+58,Temporal Inference,14|2,FMT
+59,Formula Neutralisation,51|26,DELIM
+60,TsvSpec,51,DELIM
+61,JsonSpec,14,FMTS
+62,NDJSON,61|19,FMTS
+63,JSON Property Path,61,FMTS
+64,JSON Row Shapes,61|4,FMTS
+65,Inference Sample Rows,61|68,FMTS
+66,ParquetSpec,14,FMTS
+67,Parquet Column Projection,66|2,FMTS
+68,XlsxSpec,14|6,FMTS
+69,Sheet Selection,68,FMTS
+70,Excel Is Read-Only,68|26,FMTS
+71,Workbook Container Limits,68|38,FMTS
+72,XmlSpec,14|4,FMTS
+73,XPath Selection,72,FMTS
+74,lxml and ElementTree Fallback,72|6,FMTS
+75,Format Support Matrix,51|60|61|66|68|72|21,FMTS
+76,inspect_schema,22|77,SCHEMA
+77,SchemaResult,2|14,SCHEMA
+78,Schema Basis,77,SCHEMA
+79,infer_schema_rows Budget,76,SCHEMA
+80,inspect_schema_bytes,76|25,SCHEMA
+81,Footer-Only Parquet Schema,76|66|78,SCHEMA
+82,SchemaDiscoveryUnsupportedError,76|89,SCHEMA
+83,Write Disposition,10|26,WRITE
+84,Parquet Append,83|66|21,WRITE
+85,Append Schema Check,84,WRITE
+86,create_path,10,WRITE
+87,Format Conversion,22|26,WRITE
+88,Raw Bytes Write,26,WRITE
+89,FormatError,13,ERR
+90,UnknownFormatError,89|17,ERR
+91,ParseError,89|22,ERR
+92,FormatConflictError,89|97,ERR
+93,WriteError,26,ERR
+94,AppendSchemaMismatchError,93|85,ERR
+95,MissingDependencyError,6,ERR
+96,Archive Errors,38,ERR
+97,register_format,14|17,EXT
+98,FormatParser Protocol,14,EXT
+99,FormatSerialiser Protocol,14,EXT
+100,FormatSchemaInspector Protocol,14|78,EXT
+101,Lazy Dotted-Path Registration,97,EXT
+102,Entry-Point Plugins,97|101,EXT
+103,Registration Override,97,EXT
+104,Access Mode Registration,97|48,EXT
+105,Import-Light Plugin Modules,102,EXT
+106,COMPLEX_HANDLER_KEY Linkage,14|4,EXT
+107,Read Pipeline,22|31|34|17,INT
+108,Access Routing,107|104|44,INT
+109,Output Normalisation Seam,24|21,INT
+110,Format Registry Internals,97|102,INT
+111,Registration Bootstrap,110,INT
+112,Storage Boundary Principle,7,INT
+113,Lazy Import Invariant,6,INT
+114,Engine Type Normalisation,2,INT
+115,CSV Native Path vs Lexer,51|52,INT
+116,Safe CSV Field Encoding,115|26,INT
+117,ZIP Container Hardening,38|71,INT
+118,Append Merge Semantics,85,INT
+119,XLSX Calamine Reader,68|114,INT
+120,Package Version Source,113,INT

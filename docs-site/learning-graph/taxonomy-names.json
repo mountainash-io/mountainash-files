@@ -1,0 +1,15 @@
+{
+  "FOUND": "Foundations",
+  "SPEC": "File Specs",
+  "FMT": "Format System",
+  "OPS": "Operations",
+  "SEL": "File Selection and Archives",
+  "STOR": "Storage and Transforms",
+  "DELIM": "Delimited Formats (CSV/TSV)",
+  "FMTS": "JSON, Parquet, Excel and XML",
+  "SCHEMA": "Schema Discovery",
+  "WRITE": "Writing and Append",
+  "ERR": "Errors",
+  "EXT": "Extending Formats",
+  "INT": "Internals"
+}
