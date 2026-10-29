@@ -28,7 +28,7 @@ def test_transport_dependency_and_forwarded_extras_share_candidate_range():
         if canonicalize_name(req.name) == "mountainash-transport"
     ]
     assert sum(req.marker is None for req in transport) == 1
-    for extra in ("", "s3", "gcs", "azure", "sftp", "encryption"):
+    for extra in ("", "http", "s3", "gcs", "azure", "sftp", "encryption"):
         active = [
             req for req in transport
             if (
