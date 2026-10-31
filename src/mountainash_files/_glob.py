@@ -3,12 +3,12 @@ from __future__ import annotations
 import typing as t
 from fnmatch import fnmatchcase
 
-from mountainash_transport import StorageFacade
+from mountainash_transport import POLICY_UNSET, StorageFacade
 
 if t.TYPE_CHECKING:
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import StorageProfileProtocol
-    from mountainash_transport.location import LocationPolicy
+    from mountainash_transport import PolicyOverride
 
 
 def resolve_glob(
@@ -17,7 +17,7 @@ def resolve_glob(
     *,
     storage_profile: "StorageProfileProtocol | None" = None,
     auth_profile: "AuthProfile | None" = None,
-    policy: "LocationPolicy | None" = None,
+    policy: "PolicyOverride" = POLICY_UNSET,
 ) -> list[str]:
     """Sorted paths of the files beneath *base_path* whose relative path matches *pattern*.
 

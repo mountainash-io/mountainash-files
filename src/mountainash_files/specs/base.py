@@ -3,10 +3,12 @@ from __future__ import annotations
 import dataclasses
 import typing as t
 
+from mountainash_transport import POLICY_UNSET
+
 if t.TYPE_CHECKING:
     from mountainash_auth_client import AuthProfile
     from mountainash_transport import Pipeline, StorageProfileProtocol
-    from mountainash_transport.location import LocationPolicy
+    from mountainash_transport import PolicyOverride
 
     from mountainash_files.formats._types import FormatSpec
     from mountainash_files.specs.archive import GzipCompression, ZipArchive
@@ -21,8 +23,10 @@ class FileSpec:
     (provider detected from the path scheme, anonymous access). An explicit
     ``auth_profile`` object always overrides a name-resolved one.
 
-    ``policy`` confines the spec's locations (None = no confinement). It is passed
-    explicitly to every storage facade the operations create.
+    ``policy`` is a location-policy override: omitted (``POLICY_UNSET``) inherits the
+    storage profile's ``LOCATION_POLICY``, ``None`` disables confinement and a
+    ``LocationPolicy`` replaces the profile's. It is passed unchanged to every storage
+    facade the operations create.
     """
 
     path: str
@@ -31,4 +35,4 @@ class FileSpec:
     auth_profile: AuthProfile | None = None
     archive: ZipArchive | GzipCompression | None = None
     transforms: Pipeline | None = None
-    policy: LocationPolicy | None = None
+    policy: PolicyOverride = POLICY_UNSET

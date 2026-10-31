@@ -25,6 +25,41 @@ pass the returned pair to the spec. The [offline recipe](../examples/named_profi
 demonstrates both routes with a local profile. A remote profile requires the
 appropriate transport backend, optional dependencies and credentials.
 
+## Optional location confinement
+
+Confinement is off by default. `ROOT_PATH` resolves relative paths, but does not
+reject an absolute outside path or `..`. Enable confinement in an existing
+profile, for example:
+
+```yaml
+storage_profiles:
+  reports:
+    provider: local
+    parameters:
+      ROOT_PATH: /srv/reports
+      LOCATION_POLICY: {}
+```
+
+An omitted `FileSourceSpec.policy` or `FileSinkSpec.policy` inherits the resolved
+profile policy. Explicit `policy=None` disables it; a `LocationPolicy` replaces
+it without merging remote allow-lists. This applies to parsing, streaming,
+schema inspection, glob/archive children, writing and each copy endpoint
+independently. Disabling source confinement never disables the sink's policy.
+
+For trusted access outside the configured root:
+
+```python
+source = FileSourceSpec(
+    path="../archive.csv", storage_profile="reports", policy=None,
+)
+```
+
+This does not disable authentication, TLS verification, SSH target validation or
+OS permissions. Migration: profiles that previously relied on `ROOT_PATH`
+implicitly confining access must now set `LOCATION_POLICY={}`. Profile settings
+require the existing `[http]` extra; unprofiled local access remains base-safe.
+
+
 ## Secret references
 
 For a profile containing `secret:record.field`, explicitly select a store and

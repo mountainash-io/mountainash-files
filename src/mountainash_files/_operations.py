@@ -38,8 +38,7 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
     from mountainash_auth_client import AuthProfile
-    from mountainash_transport import GPG, Gzip, RangePolicy, StorageProfileProtocol
-    from mountainash_transport.location import LocationPolicy
+    from mountainash_transport import GPG, Gzip, PolicyOverride, RangePolicy, StorageProfileProtocol
 
 _VALID_OUTPUTS = ("arrow", "pydata")
 _logger = logging.getLogger(__name__)
@@ -85,7 +84,7 @@ def _normalise_output(data: Any, output: str, spec: FormatSpec) -> Any:
 
 def _resolve_profiles(
     spec: FileSpec,
-) -> tuple["StorageProfileProtocol | None", "AuthProfile | None", "LocationPolicy | None"]:
+) -> tuple["StorageProfileProtocol | None", "AuthProfile | None", "PolicyOverride"]:
     """Materialise the spec's profile fields (spec semantics table).
 
     A string storage_profile resolves via transport's resolve_storage;
@@ -107,7 +106,7 @@ def _make_facade(
     path: str,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
-    policy: "LocationPolicy | None",
+    policy: "PolicyOverride",
 ) -> StorageFacade:
     return StorageFacade.from_path(path, storage_profile, auth_profile=auth_profile, policy=policy)
 
@@ -121,7 +120,7 @@ def _read_bytes(
     path: str,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
-    policy: "LocationPolicy | None",
+    policy: "PolicyOverride",
     transforms: Pipeline | None,
     *,
     infer: bool | None = None,
@@ -146,7 +145,7 @@ def _write_bytes(
     data: bytes,
     storage_profile: "StorageProfileProtocol | None",
     auth_profile: "AuthProfile | None",
-    policy: "LocationPolicy | None",
+    policy: "PolicyOverride",
     create_path: bool,
     transforms: Pipeline | None,
 ) -> None:

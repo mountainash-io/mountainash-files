@@ -117,3 +117,72 @@ def test_denied_credential_gpg_url_redacted_before_inference(op):
         if op == "stream":
             r.__enter__()
     assert "secret" not in str(e.value)
+
+
+# --- Opt-in confinement: omitted inherits the profile's policy, None disables, a policy replaces ---
+
+@pytest.fixture
+def confined(tmp_path):
+    """A profile whose own LOCATION_POLICY confines to ROOT_PATH, plus a file outside that root."""
+    from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+    root = tmp_path / "root"; out = tmp_path / "out"; root.mkdir(); out.mkdir()
+    (root / "a.csv").write_text("v\n1\n"); (out / "s.csv").write_text("v\n9\n")
+    return LocalStorageProfile(ROOT_PATH=str(root), LOCATION_POLICY={}), root, out
+
+
+def _run(op, spec):
+    if op == "stream":
+        with stream(spec) as handle:
+            return handle.read()
+    result, = {"parse": parse, "inspect_schema": inspect_schema}[op](spec)
+    return result.data.to_pydict() if op == "parse" else result.schema
+
+
+@pytest.mark.parametrize("op", ["parse", "inspect_schema", "stream"])
+def test_read_inherits_profile_policy_unless_overridden(confined, op):
+    profile, root, out = confined
+    outside = str(out / "s.csv")
+    with pytest.raises(LocationNotAllowed):
+        _run(op, FileSourceSpec(path=outside, format="csv", storage_profile=profile))
+    import pyarrow as pa
+
+    expected = {"parse": {"v": [9]}, "inspect_schema": pa.schema([("v", pa.int64())]),
+                "stream": b"v\n9\n"}[op]
+    assert _run(op, FileSourceSpec(path=outside, format="csv", storage_profile=profile, policy=None)) == expected
+    assert _run(op, FileSourceSpec(path=outside, format="csv", storage_profile=profile,
+                                   policy=LocationPolicy(root=str(out)))) == expected
+    inside = {"parse": {"v": [1]}, "inspect_schema": pa.schema([("v", pa.int64())]),
+              "stream": b"v\n1\n"}[op]
+    assert _run(op, FileSourceSpec(path="a.csv", format="csv", storage_profile=profile)) == inside
+
+
+def test_profile_without_policy_is_unconfined(tmp_path):
+    from mountainash_transport.settings.storage.profiles import LocalStorageProfile
+
+    (tmp_path / "root").mkdir(); (tmp_path / "s.csv").write_text("v\n9\n")
+    profile = LocalStorageProfile(ROOT_PATH=str(tmp_path / "root"))
+    assert parse(FileSourceSpec(path=str(tmp_path / "s.csv"), format="csv", storage_profile=profile))[0].data.to_pydict() == {"v": [9]}
+
+
+@pytest.mark.parametrize("mode", ["replace", "append"])
+def test_write_inherits_profile_policy_unless_overridden(confined, mode):
+    import pyarrow as pa
+
+    profile, _, out = confined
+    target = out / "w.parquet"
+    table = pa.table({"v": [1]})
+    with pytest.raises(LocationNotAllowed):
+        write(FileSinkSpec(path=str(target), format="parquet", storage_profile=profile, write_disposition=mode), table)
+    assert not target.exists()
+    write(FileSinkSpec(path=str(target), format="parquet", storage_profile=profile, policy=None, write_disposition=mode), table)
+    assert parse(FileSourceSpec(path=str(target), format="parquet"))[0].data.to_pydict() == {"v": [1]}
+
+
+def test_glob_children_inherit_or_override_the_policy(confined):
+    profile, root, out = confined
+    (root / "link.csv").symlink_to(out / "s.csv")
+    with pytest.raises(LocationNotAllowed):
+        parse(FileSourceSpec(path=".", glob="*.csv", format="csv", storage_profile=profile))
+    results = parse(FileSourceSpec(path=".", glob="*.csv", format="csv", storage_profile=profile, policy=None))
+    assert sorted(r.data.to_pydict()["v"][0] for r in results) == [1, 9]

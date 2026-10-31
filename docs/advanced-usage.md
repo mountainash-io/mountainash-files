@@ -41,6 +41,12 @@ combination (for example `access="random"` with a transform, or a server without
 byte ranges), the error propagates. Use `access="random"` for seekable ranged
 reads of remote objects. `parse()` chooses the access mode itself, per format.
 
+Source and sink `policy` overrides preserve omission: omit to inherit the
+storage profile's `LOCATION_POLICY`, pass None to disable confinement, or pass
+a `LocationPolicy` to replace it. Copy resolves each endpoint independently;
+globs and archive members retain their source's selection. See
+[profile confinement and migration](profiles.md#optional-location-confinement).
+
 ## Schema discovery
 
 ```python
