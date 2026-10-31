@@ -2,6 +2,8 @@
 title: mountainash-files
 ---
 
+[← Back to Ecosystem](https://docs.mountainash.io/)
+
 # mountainash-files
 
 mountainash-files reads and writes structured files through one Python API. It handles CSV, TSV, JSON and NDJSON, Parquet, Excel (read) and XML, on local disk or on any storage that [mountainash-transport](https://docs.mountainash.io/mountainash-transport/) can reach. You describe a file with a spec (its path, format options, storage profile and compression or encryption transforms), and an operation such as `parse`, `write` or `inspect_schema` acts on it. Tabular reads return Arrow tables by default, or Python records if you ask for them.
