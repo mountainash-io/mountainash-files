@@ -54,6 +54,10 @@ LOCATIONS = {
     "scheme-less-userinfo": "SENTU:SENTP@host.example/x.xyz",
     "scheme-less-userinfo-and-query": "SENTU:SENTP@host.example/x.xyz?token=SENTQ",
     "network-path-userinfo": "//SENTU:SENTP@host.example/x.xyz",
+    "fragment-token": "https://host.example/x.xyz#access_token=SENTQ",
+    "single-slash": "https:/SENTU:SENTP@host.example/x.xyz",
+    "opaque-scheme": "s3:SENTU:SENTP@bucket/x.xyz",
+    "leading-whitespace": " \thttps://SENTU:SENTP@host.example/x.xyz",
 }
 
 OPERATIONS = {
@@ -69,12 +73,27 @@ def test_unknown_format_error_hides_credentials(operation, location):
     with pytest.raises(UnknownFormatError) as info:
         operation(location)
     assert_no_sentinel(info.value)
-    assert "host.example" in str(info.value) or "bucket" in str(info.value)
+
+
+@pytest.mark.parametrize(
+    ("location", "shown"),
+    [
+        ("sftp://SENTU:SENTP@host.example:2222/x.xyz?token=SENTQ#frag", "sftp://host.example:2222/x.xyz"),
+        ("https://SENTU:pa@SENTP@[::1]:8443/d/x.xyz", "https://[::1]:8443/d/x.xyz"),
+        ("//SENTU:SENTP@host.example/x.xyz", "//host.example/x.xyz"),
+        ("https://host.example/a@b/x.xyz", "https://host.example/a@b/x.xyz"),
+        ("SENTU:SENTP@host.example/x.xyz", "***"),
+        ("https:/SENTU:SENTP@host.example/x.xyz", "***"),
+        ("a:SENTP@host/x.xyz", "***"),
+    ],
+)
+def test_remote_locations_show_only_scheme_host_and_path(location, shown):
+    assert UnknownFormatError(path=location, known_suffixes=(".csv",)).path == shown
 
 
 @pytest.mark.parametrize(
     "path",
-    ["data/x.xyz", "/srv/team@corp/x.xyz", "C:/data/x.xyz", "relative/a:b@c/x.xyz"],
+    ["data/x.xyz", "/srv/team@corp/x.xyz", "C:/data/x.xyz", "C:\\data\\x.xyz", "relative/a:b@c/x.xyz"],
 )
 def test_local_paths_are_shown_unchanged(path):
     assert UnknownFormatError(path=path, known_suffixes=(".csv",)).path == path
@@ -83,16 +102,6 @@ def test_local_paths_are_shown_unchanged(path):
 def test_pathlike_location_is_reported_as_text():
     err = UnknownFormatError(path=PurePosixPath("/data/x.xyz"), known_suffixes=(".csv",))
     assert err.path == "/data/x.xyz"
-
-
-def test_redacted_location_keeps_query_keys_and_host():
-    err = UnknownFormatError(path=LOCATIONS["userinfo-and-query"], known_suffixes=(".csv",))
-    assert err.path == "sftp://***@host.example/x.xyz?token=***#frag"
-
-
-def test_at_in_path_is_not_userinfo():
-    err = UnknownFormatError(path="https://host.example/a@b/x.xyz", known_suffixes=(".csv",))
-    assert err.path == "https://host.example/a@b/x.xyz"
 
 
 def _zip(member: str) -> bytes:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mountainash_files._redact import redact_location
+from mountainash_files._safe_location import safe_location
 
 
 class FormatError(Exception):
@@ -18,7 +18,7 @@ class UnknownFormatError(FormatError):
         failed_plugins: tuple[str, ...] = (),
         failures: dict[str, Exception] | None = None,
     ):
-        self.path = None if path is None else redact_location(path)
+        self.path = None if path is None else safe_location(path)
         self.known_suffixes = known_suffixes
         self.failed_plugins = failed_plugins
         msg = (
