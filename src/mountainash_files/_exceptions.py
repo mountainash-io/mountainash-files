@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from mountainash_files._redact import redact_location
+
 if TYPE_CHECKING:
     import pyarrow as pa
 
@@ -15,11 +17,11 @@ class AppendSchemaMismatchError(WriteError):
     def __init__(
         self, path: str, expected_schema: "pa.Schema", actual_schema: "pa.Schema"
     ) -> None:
-        self.path = path
+        self.path = redact_location(path)
         self.expected_schema = expected_schema
         self.actual_schema = actual_schema
         super().__init__(
-            f"Append schema mismatch for {path!r}: expected {expected_schema}, got {actual_schema}"
+            f"Append schema mismatch for {self.path!r}: expected {expected_schema}, got {actual_schema}"
         )
 
 
