@@ -1,40 +1,39 @@
 """Credential redaction for locations shown in errors (W8)."""
 from __future__ import annotations
 
+import os
+
 REDACTED = "***"
 
 
-def redact_location(location: str) -> str:
-    """Mask URL userinfo and every query value in *location*; keys, host and path stay.
+def redact_location(location: str | os.PathLike[str]) -> str:
+    """Mask the userinfo and every query value of one location; keys, host and path stay.
 
-    Userinfo ends at the last ``@`` of the authority, as ``urllib.parse.urlsplit``
-    reads it. Without ``://``, a first path segment of the form ``user:pass@host``
-    is treated as userinfo; other local paths are returned unchanged.
+    Matches mountainash-transport's location redaction. With ``//`` the userinfo
+    runs to the last ``@`` of the authority, as ``urllib.parse.urlsplit`` reads it
+    (``scheme://user:pw@host`` and ``//user:pw@host``). Without ``//``, a first
+    segment holding an ``@`` (``user:pass@host/x``, ``s3:user:pw@bucket``) has that
+    prefix masked. Other local paths are returned unchanged.
     """
-    start = location.find("://")
-    if start < 0:
-        segment = location.split("/", 1)[0]
-        at = segment.rfind("@")
-        if at > 0 and ":" in segment[:at]:
-            return f"{REDACTED}{location[at:]}"
-        return location
-    start += 3
-    end = len(location)
+    text = os.fspath(location)
+    slashes = text.find("//")
+    start = slashes + 2 if slashes >= 0 else 0
+    end = len(text)
     for delimiter in "/?#":
-        index = location.find(delimiter, start, end)
+        index = text.find(delimiter, start, end)
         if index != -1:
             end = index
-    at = location.rfind("@", start, end)
+    at = text.rfind("@", start, end)
     if at != -1:
-        location = f"{location[:start]}{REDACTED}{location[at:]}"
-    query = location.find("?", start)
-    first_fragment = location.find("#", start)
-    if query == -1 or first_fragment != -1 and first_fragment < query:
-        return location
-    fragment = location.find("#", query)
-    stop = len(location) if fragment == -1 else fragment
+        text = f"{text[:start]}{REDACTED}{text[at:]}"
+    query = text.find("?", start)
+    fragment = text.find("#", start)
+    if query == -1 or fragment != -1 and fragment < query:
+        return text
+    fragment = text.find("#", query)
+    stop = len(text) if fragment == -1 else fragment
     masked = "&".join(
         f"{part.split('=', 1)[0]}={REDACTED}" if "=" in part else (REDACTED if part else part)
-        for part in location[query + 1 : stop].split("&")
+        for part in text[query + 1 : stop].split("&")
     )
-    return f"{location[: query + 1]}{masked}{location[stop:]}"
+    return f"{text[: query + 1]}{masked}{text[stop:]}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import traceback
 import zipfile
+from pathlib import PurePosixPath
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -51,6 +52,8 @@ LOCATIONS = {
     "query-token": "https://host.example/x.xyz?X-Amz-Signature=SENTQ&X-Amz-Credential=SENTQ",
     "userinfo-and-query": "sftp://SENTU:SENTP@host.example/x.xyz?token=SENTQ#frag",
     "scheme-less-userinfo": "SENTU:SENTP@host.example/x.xyz",
+    "scheme-less-userinfo-and-query": "SENTU:SENTP@host.example/x.xyz?token=SENTQ",
+    "network-path-userinfo": "//SENTU:SENTP@host.example/x.xyz",
 }
 
 OPERATIONS = {
@@ -75,6 +78,11 @@ def test_unknown_format_error_hides_credentials(operation, location):
 )
 def test_local_paths_are_shown_unchanged(path):
     assert UnknownFormatError(path=path, known_suffixes=(".csv",)).path == path
+
+
+def test_pathlike_location_is_reported_as_text():
+    err = UnknownFormatError(path=PurePosixPath("/data/x.xyz"), known_suffixes=(".csv",))
+    assert err.path == "/data/x.xyz"
 
 
 def test_redacted_location_keeps_query_keys_and_host():

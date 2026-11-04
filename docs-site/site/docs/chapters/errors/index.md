@@ -34,7 +34,7 @@ Some failures come from elsewhere and pass through unchanged:
 
 `on_missing="skip"` absorbs only `PathNotFoundError` for a missing source ([Missing files](../selecting-files/index.md#missing-files)). Every other error still raises.
 
-Locations in files errors are redacted. URL userinfo (`user:pass@`) and every query-string value (`?X-Amz-Signature=***`, keys kept) are replaced with `***` in messages and in the `path` attributes of `UnknownFormatError` and `AppendSchemaMismatchError`, so `https://user:pw@host/x.dat?token=t` is reported as `https://***@host/x.dat?token=***`. Local paths are shown unchanged. Transport errors apply transport's own redaction.
+Locations in files errors are redacted the same way transport redacts them. URL userinfo (`user:pass@`, including a `//user:pass@host` network path) and every query-string value (`?X-Amz-Signature=***`, keys kept) are replaced with `***` in messages and in the `path` attributes of `UnknownFormatError` and `AppendSchemaMismatchError`, so `https://user:pw@host/x.dat?token=t` is reported as `https://***@host/x.dat?token=***`. A path without `//` whose first segment contains `@` (`user:pass@host/x.dat`) has that prefix masked; other local paths are shown unchanged.
 
 ## Format errors
 
