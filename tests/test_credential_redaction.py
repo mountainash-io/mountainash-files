@@ -9,6 +9,7 @@ import zipfile
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+from mountainash_transport.location import LocationPolicy
 
 from mountainash_files import (
     AppendSchemaMismatchError,
@@ -58,17 +59,27 @@ LOCATIONS = {
 }
 
 OPERATIONS = {
-    "parse": lambda path: parse(FileSourceSpec(path=path)),
-    "inspect_schema": lambda path: inspect_schema(FileSourceSpec(path=path)),
-    "write": lambda path: write(FileSinkSpec(path=path), pa.table({"a": [1]})),
+    "parse": lambda path, policy: parse(FileSourceSpec(path=path, policy=policy)),
+    "inspect_schema": lambda path, policy: inspect_schema(FileSourceSpec(path=path, policy=policy)),
+    "write": lambda path, policy: write(FileSinkSpec(path=path, policy=policy), pa.table({"a": [1]})),
+}
+
+POLICIES = {
+    "no-policy": None,
+    "policy": LocationPolicy(allowed_remote={"http": frozenset({"127.0.0.1"})}),
 }
 
 
+def files_logs(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name.startswith("mountainash_files")]
+
+
+@pytest.mark.parametrize("policy", POLICIES.values(), ids=POLICIES.keys())
 @pytest.mark.parametrize("location", LOCATIONS.values(), ids=LOCATIONS.keys())
 @pytest.mark.parametrize("operation", OPERATIONS.values(), ids=OPERATIONS.keys())
-def test_unknown_format_error_hides_credentials(operation, location):
+def test_unknown_format_error_hides_credentials(operation, location, policy):
     with pytest.raises(UnknownFormatError) as info:
-        operation(location)
+        operation(location, policy)
     assert_no_sentinel(info.value)
 
 
@@ -79,54 +90,94 @@ def _zip(member: str) -> bytes:
     return buffer.getvalue()
 
 
+def _credential_url(base: str, name: str) -> str:
+    return base.replace("http://", "http://SENTU:SENTP@") + f"/{name}?sig=SENTQ#SENTF"
+
+
+@pytest.mark.parametrize("policy", POLICIES.values(), ids=POLICIES.keys())
 @pytest.mark.parametrize("on_unrecognised", ["error", "skip"])
-def test_archive_parse_errors_hide_credentials(on_unrecognised, caplog):
+def test_archive_parse_errors_hide_credentials(on_unrecognised, policy, caplog):
     with serve({"a.zip?sig=SENTQ": _zip("member.xyz")}) as (base, _):
-        url = base.replace("http://", "http://SENTU:SENTP@") + "/a.zip?sig=SENTQ#SENTF"
-        with caplog.at_level(logging.WARNING), pytest.raises(ParseError) as info:
-            parse(FileSourceSpec(path=url, archive=ZipArchive(on_unrecognised=on_unrecognised)))
-    assert_no_sentinel(info.value, caplog.messages)
+        url = _credential_url(base, "a.zip")
+        source = FileSourceSpec(path=url, archive=ZipArchive(on_unrecognised=on_unrecognised), policy=policy)
+        with caplog.at_level(logging.DEBUG), pytest.raises(ParseError) as info:
+            parse(source)
+    assert_no_sentinel(info.value, files_logs(caplog))
     assert "127.0.0.1" in str(info.value)
 
 
-def test_append_schema_mismatch_hides_credentials():
+@pytest.mark.parametrize("policy", POLICIES.values(), ids=POLICIES.keys())
+def test_append_schema_mismatch_hides_credentials(policy):
     existing = io.BytesIO()
     pq.write_table(pa.table({"a": [1]}), existing)
     with serve({"m.parquet?sig=SENTQ": existing.getvalue()}) as (base, _):
-        url = base.replace("http://", "http://SENTU:SENTP@") + "/m.parquet?sig=SENTQ"
-        sink = FileSinkSpec(path=url, format="parquet", write_disposition="append")
+        sink = FileSinkSpec(
+            path=_credential_url(base, "m.parquet"), format="parquet",
+            write_disposition="append", policy=policy,
+        )
         with pytest.raises(AppendSchemaMismatchError) as info:
             write(sink, pa.table({"b": ["x"]}))
     assert_no_sentinel(info.value)
 
 
-def test_append_combine_failure_shows_type_only_and_no_chain(monkeypatch, tmp_path):
-    path = str(tmp_path / "m.parquet")
-    write(FileSinkSpec(path=path), pa.table({"a": [1]}))
+def test_append_combine_failure_hides_location_and_native_text(monkeypatch):
+    existing = io.BytesIO()
+    pq.write_table(pa.table({"a": [1]}), existing)
 
     def fail(_tables):
         raise pa.ArrowInvalid("SENTQ leaked from pyarrow")
 
     monkeypatch.setattr(pa, "concat_tables", fail)
-    with pytest.raises(WriteError) as info:
-        write(FileSinkSpec(path=path, write_disposition="append"), pa.table({"a": [2]}))
+    with serve({"m.parquet?sig=SENTQ": existing.getvalue()}) as (base, _):
+        sink = FileSinkSpec(path=_credential_url(base, "m.parquet"), format="parquet", write_disposition="append")
+        with pytest.raises(WriteError) as info:
+            write(sink, pa.table({"a": [2]}))
     assert "ArrowInvalid" in str(info.value)
+    assert "127.0.0.1" in str(info.value)
     assert info.value.__cause__ is None and info.value.__context__ is None
     assert_no_sentinel(info.value)
 
 
-def test_unsafe_member_resolution_error_is_not_shown_or_chained(monkeypatch):
+def _parse_archive_with_member_failure(monkeypatch, make_failure, on_unrecognised, caplog):
     import mountainash_files._operations as operations
 
     def fail(**_kwargs):
-        raise ValueError("SENTQ from a plugin")
+        raise make_failure()
 
     monkeypatch.setattr(operations, "resolve_format", fail)
-    with serve({"a.zip": _zip("member.csv")}) as (base, _), pytest.raises(ParseError) as info:
-        parse(FileSourceSpec(path=f"{base}/a.zip", archive=ZipArchive()))
-    assert "ValueError" in str(info.value)
-    assert info.value.__cause__ is None and info.value.__context__ is None
-    assert_no_sentinel(info.value)
+    archive = ZipArchive(on_unrecognised=on_unrecognised)
+    with (
+        serve({"a.zip": _zip("member.csv")}) as (base, _),
+        caplog.at_level(logging.DEBUG),
+        pytest.raises(ParseError) as info,
+    ):
+        parse(FileSourceSpec(path=f"{base}/a.zip", archive=archive))
+    return info.value
+
+
+@pytest.mark.parametrize("on_unrecognised", ["error", "skip"])
+@pytest.mark.parametrize(
+    "make_failure",
+    [lambda: ValueError("SENTQ from a plugin"), lambda: ParseError("csv", "SENTQ from a plugin")],
+    ids=["native", "content-parse-error"],
+)
+def test_unsafe_member_resolution_error_is_not_shown_or_chained(monkeypatch, caplog, make_failure, on_unrecognised):
+    error = _parse_archive_with_member_failure(monkeypatch, make_failure, on_unrecognised, caplog)
+    shown = str(error) if on_unrecognised == "error" else " ".join(files_logs(caplog))
+    assert type(make_failure()).__name__ in shown
+    assert error.__cause__ is None and error.__context__ is None
+    assert_no_sentinel(error, files_logs(caplog))
+
+
+def test_oserror_member_failure_is_chained_without_filename(monkeypatch, caplog):
+    def make_failure():
+        return FileNotFoundError(2, "No such file or directory", "https://SENTU:SENTP@h/x?SENTQ")
+
+    error = _parse_archive_with_member_failure(monkeypatch, make_failure, "error", caplog)
+    assert "[Errno 2] No such file or directory" in str(error)
+    assert type(error.__cause__) is FileNotFoundError
+    assert error.__cause__.filename is None
+    assert_no_sentinel(error)
 
 
 def test_oserror_detail_keeps_errno_and_strerror_only():
@@ -134,5 +185,10 @@ def test_oserror_detail_keeps_errno_and_strerror_only():
     assert safe_detail(exc) == "[Errno 2] No such file or directory"
 
 
-def test_other_native_detail_is_type_name_only():
-    assert safe_detail(RuntimeError("SENTQ")) == "RuntimeError"
+@pytest.mark.parametrize(
+    "exc",
+    [RuntimeError("SENTQ"), ParseError("csv", "SENTQ content"), WriteError("SENTQ")],
+    ids=["native", "parse-error", "write-error"],
+)
+def test_other_detail_is_type_name_only(exc):
+    assert safe_detail(exc) == type(exc).__name__

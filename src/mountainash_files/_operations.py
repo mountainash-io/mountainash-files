@@ -18,7 +18,7 @@ from mountainash_transport import (
 )
 
 from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
-from mountainash_files._safe_location import is_safe_cause, safe_detail, safe_location
+from mountainash_files._safe_location import safe_cause, safe_detail, safe_location
 from mountainash_files.formats._registry import (
     get_access,
     get_parser,
@@ -280,8 +280,9 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
                 f"format ({safe_detail(failure)}); scope members with file_pattern or set "
                 "on_unrecognised='skip'",
             )
-            if is_safe_cause(failure):
-                raise error from failure
+            cause = safe_cause(failure)
+            if cause is not None:
+                raise error from cause
             raise error
         if not results:
             raise ParseError(

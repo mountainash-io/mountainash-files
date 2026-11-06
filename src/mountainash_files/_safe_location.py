@@ -54,28 +54,44 @@ def safe_location(location: str | os.PathLike[str]) -> str:
     return text[:authority_start] + text[host_start:authority_end] + text[authority_end:path_end]
 
 
-def _is_package_error(exc: BaseException) -> bool:
-    from mountainash_files._exceptions import WriteError
-    from mountainash_files.formats._exceptions import FormatError
+def _is_trusted_error(exc: BaseException) -> bool:
+    """Files errors whose message and attributes are built under the W8 rule."""
+    from mountainash_files.formats._exceptions import (
+        FormatResolutionError,
+        UnknownFormatError,
+    )
 
-    return isinstance(exc, (FormatError, WriteError))
+    return type(exc) in (UnknownFormatError, FormatResolutionError)
 
 
-def is_safe_cause(exc: BaseException) -> bool:
-    """Whether *exc* may stay in an error's chain: an OSError or a files error."""
-    return isinstance(exc, OSError) or _is_package_error(exc)
+def safe_cause(exc: BaseException) -> BaseException | None:
+    """The exception an error may chain as ``__cause__`` in place of *exc*, if any.
+
+    OSError: a fresh exception of the same type with only ``errno`` and
+    ``strerror``, so the filename is unreachable. Trusted files errors: *exc*.
+    Anything else: ``None``; raise outside the ``except`` block so that
+    ``__context__`` stays empty too.
+    """
+    if isinstance(exc, OSError):
+        if exc.errno is None:
+            return None
+        try:
+            return type(exc)(exc.errno, exc.strerror)
+        except TypeError:  # a subclass whose constructor takes other arguments
+            return OSError(exc.errno, exc.strerror)
+    return exc if _is_trusted_error(exc) else None
 
 
 def safe_detail(exc: BaseException) -> str:
     """Native exception text an error may show (spec section 2).
 
-    OSError: ``[Errno N] strerror`` only, never the filename. Files' own errors
-    (built with ``safe_location``): their message. Anything else: the class name.
+    OSError: ``[Errno N] strerror`` only, never the filename. Trusted files
+    errors: their message. Anything else: the class name.
     """
     if isinstance(exc, OSError):
         if exc.errno is None:
             return type(exc).__name__
         return f"[Errno {exc.errno}] {exc.strerror}"
-    if _is_package_error(exc):
+    if _is_trusted_error(exc):
         return str(exc)
     return type(exc).__name__

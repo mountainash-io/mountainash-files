@@ -18,6 +18,8 @@ RENDERING = [
     ("https://host/x.csv#access_token=SENTF", "https://host/x.csv"),
     ("https://host/x.csv?SENTQ", "https://host/x.csv"),
     ("https://host/x.csv#f?tok=SENTQ", "https://host/x.csv"),
+    ("https://h#SENTF@x/y", "https://h"),
+    ("https://h?SENTQ@x/y", "https://h"),
     ("https://host", "https://host"),
     ("s3://bucket/x.csv", "s3://bucket/x.csv"),
     ("file:///tmp/x.csv", "file:///tmp/x.csv"),
@@ -28,6 +30,10 @@ RENDERING = [
     # whitespace / control characters, as urllib reads them
     (" \thttps://SENTU:SENTP@host/x.csv", "https://host/x.csv"),
     ("https://SENTU:SENTP@ho\nst/x.csv", "https://host/x.csv"),
+    ("https://SENTU:SENTP@ho\rst/x.csv", "https://host/x.csv"),
+    ("ht\ttps://SENTU:SENTP@host/x.csv", "https://host/x.csv"),
+    ("\x00https://SENTU:SENTP@host/x.csv", "https://host/x.csv"),
+    ("\x1fhttps://SENTU:SENTP@host/x.csv", "https://host/x.csv"),
     # other scheme strings
     ("https:/SENTU:SENTP@host/x.csv", "***"),
     ("s3:SENTU:SENTP@bucket/x.csv", "***"),
