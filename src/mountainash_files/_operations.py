@@ -18,6 +18,7 @@ from mountainash_transport import (
 )
 
 from mountainash_files._exceptions import AppendSchemaMismatchError, WriteError
+from mountainash_files._safe_location import safe_cause, safe_detail, safe_location
 from mountainash_files.formats._registry import (
     get_access,
     get_parser,
@@ -260,26 +261,33 @@ def _read_source(source: FileSourceSpec, *, params: dict[str, Any] | None, make:
                     fmt_key, ms = resolve_format(path=path)
                     fmt_spec = get_spec_class(fmt_key)(**get_suffix_overrides(ms))
             except Exception as exc:
-                if on_unrecognised == "skip":
-                    skipped.append(member_name)
-                    _logger.warning(
-                        "Skipping archive member %r (unrecognised format): %s",
-                        member_name,
-                        exc,
-                    )
-                    continue
-                raise ParseError(
-                    "archive",
-                    f"member {member_name!r} in {path!r} has no resolvable "
-                    f"format ({exc}); scope members with file_pattern or set "
-                    "on_unrecognised='skip'",
-                ) from exc
-            on_bytes, _ = make(fmt_key, fmt_spec)
-            results.append(on_bytes(member_data))
+                failure = exc
+            else:
+                on_bytes, _ = make(fmt_key, fmt_spec)
+                results.append(on_bytes(member_data))
+                continue
+            if on_unrecognised == "skip":
+                skipped.append(member_name)
+                _logger.warning(
+                    "Skipping archive member %r (unrecognised format): %s",
+                    member_name,
+                    safe_detail(failure),
+                )
+                continue
+            error = ParseError(
+                "archive",
+                f"member {member_name!r} in {safe_location(path)!r} has no resolvable "
+                f"format ({safe_detail(failure)}); scope members with file_pattern or set "
+                "on_unrecognised='skip'",
+            )
+            cause = safe_cause(failure)
+            if cause is not None:
+                raise error from cause
+            raise error
         if not results:
             raise ParseError(
                 "archive",
-                f"archive {path!r} produced no recognised members "
+                f"archive {safe_location(path)!r} produced no recognised members "
                 f"(skipped: {skipped or 'none'})",
             )
         if skipped:
@@ -438,7 +446,10 @@ def _merge_append_tables(path: str, existing: pa.Table, incoming: pa.Table) -> p
         after = pa.Table.from_arrays(incoming.columns, schema=schema)
         return pa.concat_tables([before, after])
     except pa.ArrowException as exc:
-        raise WriteError(f"Cannot combine append tables for {path!r}: {exc}") from exc
+        failure = safe_detail(exc)
+    raise WriteError(
+        f"Cannot combine append tables for {safe_location(path)!r}: {failure}"
+    )
 
 
 def write(

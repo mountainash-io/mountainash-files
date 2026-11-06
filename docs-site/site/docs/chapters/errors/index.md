@@ -34,6 +34,8 @@ Some failures come from elsewhere and pass through unchanged:
 
 `on_missing="skip"` absorbs only `PathNotFoundError` for a missing source ([Missing files](../selecting-files/index.md#missing-files)). Every other error still raises.
 
+Files errors show only the safe parts of a location, in messages and in the `path` attributes of `UnknownFormatError` and `AppendSchemaMismatchError`. For a URL (`scheme://…` or `//…`) that is the scheme, host, port and path; user name, password, query string and fragment are left out, so `https://user:pw@host/x.dat?token=t#f` is reported as `https://host/x.dat`. Any other string that starts with a scheme (`s3:bucket/x.dat`, `user:pass@host/x.dat`) is reported as `***`. Local paths, including `C:/` drives, are shown unchanged. The `path` attribute holds this display form, not the value you passed. Text from other libraries' exceptions is shown only for operating-system errors (`[Errno 2] No such file or directory`); otherwise only the exception's type name.
+
 ## Format errors
 
 <!-- concept:89 -->
