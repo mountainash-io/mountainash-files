@@ -52,3 +52,30 @@ def safe_location(location: str | os.PathLike[str]) -> str:
     host_start = authority_start if at == -1 else at + 1
     path_end = _first(text, "?#", authority_end, len(text))
     return text[:authority_start] + text[host_start:authority_end] + text[authority_end:path_end]
+
+
+def _is_package_error(exc: BaseException) -> bool:
+    from mountainash_files._exceptions import WriteError
+    from mountainash_files.formats._exceptions import FormatError
+
+    return isinstance(exc, (FormatError, WriteError))
+
+
+def is_safe_cause(exc: BaseException) -> bool:
+    """Whether *exc* may stay in an error's chain: an OSError or a files error."""
+    return isinstance(exc, OSError) or _is_package_error(exc)
+
+
+def safe_detail(exc: BaseException) -> str:
+    """Native exception text an error may show (spec section 2).
+
+    OSError: ``[Errno N] strerror`` only, never the filename. Files' own errors
+    (built with ``safe_location``): their message. Anything else: the class name.
+    """
+    if isinstance(exc, OSError):
+        if exc.errno is None:
+            return type(exc).__name__
+        return f"[Errno {exc.errno}] {exc.strerror}"
+    if _is_package_error(exc):
+        return str(exc)
+    return type(exc).__name__

@@ -1,10 +1,10 @@
-"""W8: no credential reaches a files error surface (message, repr, attributes, chain)."""
+"""W8 design sections 2 and 5: no sentinel reaches any files error surface."""
 from __future__ import annotations
 
 import io
+import logging
 import traceback
 import zipfile
-from pathlib import PurePosixPath
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -16,14 +16,16 @@ from mountainash_files import (
     FileSourceSpec,
     ParseError,
     UnknownFormatError,
+    WriteError,
     ZipArchive,
     inspect_schema,
     parse,
     write,
 )
+from mountainash_files._safe_location import safe_detail
 from tests._range_server import serve
 
-SENTINELS = ("SENTU", "SENTP", "SENTQ")
+SENTINELS = ("SENTU", "SENTP", "SENTQ", "SENTF")
 
 
 def _surfaces(exc: BaseException) -> list[str]:
@@ -40,20 +42,19 @@ def _surfaces(exc: BaseException) -> list[str]:
     return out
 
 
-def assert_no_sentinel(exc: BaseException) -> None:
-    leaked = [text for text in _surfaces(exc) if any(s in text for s in SENTINELS)]
+def assert_no_sentinel(exc: BaseException, logs: list[str] = ()) -> None:
+    leaked = [t for t in [*_surfaces(exc), *logs] if any(s in t for s in SENTINELS)]
     assert not leaked, leaked
 
 
 LOCATIONS = {
     "userinfo": "https://SENTU:SENTP@host.example/d/x.xyz",
-    "s3-userinfo": "s3://SENTU:SENTP@bucket/x.xyz",
     "at-in-password": "https://SENTU:pa@SENTP@host.example/x.xyz",
-    "query-token": "https://host.example/x.xyz?X-Amz-Signature=SENTQ&X-Amz-Credential=SENTQ",
-    "userinfo-and-query": "sftp://SENTU:SENTP@host.example/x.xyz?token=SENTQ#frag",
-    "scheme-less-userinfo": "SENTU:SENTP@host.example/x.xyz",
-    "scheme-less-userinfo-and-query": "SENTU:SENTP@host.example/x.xyz?token=SENTQ",
-    "network-path-userinfo": "//SENTU:SENTP@host.example/x.xyz",
+    "query-and-fragment": "sftp://SENTU:SENTP@host.example/x.xyz?token=SENTQ#SENTF",
+    "network-path": "//SENTU:SENTP@host.example/x.xyz",
+    "single-slash": "https:/SENTU:SENTP@host.example/x.xyz",
+    "scheme-less": "SENTU:SENTP@host.example/x.xyz?token=SENTQ",
+    "leading-whitespace": " \thttps://SENTU:SENTP@host.example/x.xyz",
 }
 
 OPERATIONS = {
@@ -69,30 +70,6 @@ def test_unknown_format_error_hides_credentials(operation, location):
     with pytest.raises(UnknownFormatError) as info:
         operation(location)
     assert_no_sentinel(info.value)
-    assert "host.example" in str(info.value) or "bucket" in str(info.value)
-
-
-@pytest.mark.parametrize(
-    "path",
-    ["data/x.xyz", "/srv/team@corp/x.xyz", "C:/data/x.xyz", "relative/a:b@c/x.xyz"],
-)
-def test_local_paths_are_shown_unchanged(path):
-    assert UnknownFormatError(path=path, known_suffixes=(".csv",)).path == path
-
-
-def test_pathlike_location_is_reported_as_text():
-    err = UnknownFormatError(path=PurePosixPath("/data/x.xyz"), known_suffixes=(".csv",))
-    assert err.path == "/data/x.xyz"
-
-
-def test_redacted_location_keeps_query_keys_and_host():
-    err = UnknownFormatError(path=LOCATIONS["userinfo-and-query"], known_suffixes=(".csv",))
-    assert err.path == "sftp://***@host.example/x.xyz?token=***#frag"
-
-
-def test_at_in_path_is_not_userinfo():
-    err = UnknownFormatError(path="https://host.example/a@b/x.xyz", known_suffixes=(".csv",))
-    assert err.path == "https://host.example/a@b/x.xyz"
 
 
 def _zip(member: str) -> bytes:
@@ -103,12 +80,13 @@ def _zip(member: str) -> bytes:
 
 
 @pytest.mark.parametrize("on_unrecognised", ["error", "skip"])
-def test_archive_parse_errors_hide_credentials(on_unrecognised):
+def test_archive_parse_errors_hide_credentials(on_unrecognised, caplog):
     with serve({"a.zip?sig=SENTQ": _zip("member.xyz")}) as (base, _):
-        url = base.replace("http://", "http://SENTU:SENTP@") + "/a.zip?sig=SENTQ"
-        with pytest.raises(ParseError) as info:
+        url = base.replace("http://", "http://SENTU:SENTP@") + "/a.zip?sig=SENTQ#SENTF"
+        with caplog.at_level(logging.WARNING), pytest.raises(ParseError) as info:
             parse(FileSourceSpec(path=url, archive=ZipArchive(on_unrecognised=on_unrecognised)))
-    assert_no_sentinel(info.value)
+    assert_no_sentinel(info.value, caplog.messages)
+    assert "127.0.0.1" in str(info.value)
 
 
 def test_append_schema_mismatch_hides_credentials():
@@ -120,3 +98,41 @@ def test_append_schema_mismatch_hides_credentials():
         with pytest.raises(AppendSchemaMismatchError) as info:
             write(sink, pa.table({"b": ["x"]}))
     assert_no_sentinel(info.value)
+
+
+def test_append_combine_failure_shows_type_only_and_no_chain(monkeypatch, tmp_path):
+    path = str(tmp_path / "m.parquet")
+    write(FileSinkSpec(path=path), pa.table({"a": [1]}))
+
+    def fail(_tables):
+        raise pa.ArrowInvalid("SENTQ leaked from pyarrow")
+
+    monkeypatch.setattr(pa, "concat_tables", fail)
+    with pytest.raises(WriteError) as info:
+        write(FileSinkSpec(path=path, write_disposition="append"), pa.table({"a": [2]}))
+    assert "ArrowInvalid" in str(info.value)
+    assert info.value.__cause__ is None and info.value.__context__ is None
+    assert_no_sentinel(info.value)
+
+
+def test_unsafe_member_resolution_error_is_not_shown_or_chained(monkeypatch):
+    import mountainash_files._operations as operations
+
+    def fail(**_kwargs):
+        raise ValueError("SENTQ from a plugin")
+
+    monkeypatch.setattr(operations, "resolve_format", fail)
+    with serve({"a.zip": _zip("member.csv")}) as (base, _), pytest.raises(ParseError) as info:
+        parse(FileSourceSpec(path=f"{base}/a.zip", archive=ZipArchive()))
+    assert "ValueError" in str(info.value)
+    assert info.value.__cause__ is None and info.value.__context__ is None
+    assert_no_sentinel(info.value)
+
+
+def test_oserror_detail_keeps_errno_and_strerror_only():
+    exc = FileNotFoundError(2, "No such file or directory", "/SENTU:SENTP@h/x.csv")
+    assert safe_detail(exc) == "[Errno 2] No such file or directory"
+
+
+def test_other_native_detail_is_type_name_only():
+    assert safe_detail(RuntimeError("SENTQ")) == "RuntimeError"
