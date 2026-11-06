@@ -180,6 +180,35 @@ def test_oserror_member_failure_is_chained_without_filename(monkeypatch, caplog)
     assert_no_sentinel(error)
 
 
+class _PickyOSError(OSError):
+    """An OSError subclass whose constructor rejects the two-argument form."""
+
+    def __init__(self, *args):
+        if len(args) == 2:
+            raise ValueError("SENTQ from the constructor")
+        super().__init__(*args)
+
+
+def test_oserror_subclass_that_cannot_be_rebuilt_is_chained_as_plain_oserror(monkeypatch, caplog):
+    def make_failure():
+        return _PickyOSError(2, "No such file or directory", "https://SENTU:SENTP@h/x?SENTQ")
+
+    error = _parse_archive_with_member_failure(monkeypatch, make_failure, "error", caplog)
+    assert isinstance(error.__cause__, OSError) and error.__cause__.errno == 2
+    assert error.__cause__.filename is None
+    assert_no_sentinel(error)
+
+
+def test_oserror_without_errno_is_not_chained(monkeypatch, caplog):
+    def make_failure():
+        return OSError("SENTQ message")
+
+    error = _parse_archive_with_member_failure(monkeypatch, make_failure, "error", caplog)
+    assert "OSError" in str(error)
+    assert error.__cause__ is None and error.__context__ is None
+    assert_no_sentinel(error)
+
+
 def test_oserror_detail_keeps_errno_and_strerror_only():
     exc = FileNotFoundError(2, "No such file or directory", "/SENTU:SENTP@h/x.csv")
     assert safe_detail(exc) == "[Errno 2] No such file or directory"

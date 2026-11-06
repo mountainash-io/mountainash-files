@@ -77,7 +77,7 @@ def safe_cause(exc: BaseException) -> BaseException | None:
             return None
         try:
             return type(exc)(exc.errno, exc.strerror)
-        except TypeError:  # a subclass whose constructor takes other arguments
+        except Exception:  # noqa: BLE001 - any subclass constructor failure falls back to OSError
             return OSError(exc.errno, exc.strerror)
     return exc if _is_trusted_error(exc) else None
 
