@@ -48,6 +48,7 @@ nav:
 
   - License: license.md
   - Contact: contact.md
+  - About: about.md
 
 # Theme configuration
 theme:
