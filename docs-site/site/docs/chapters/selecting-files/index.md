@@ -92,6 +92,8 @@ The rules follow from `str.format`:
 
 Templates build paths from values, so treat `params` from untrusted input like any other untrusted path: a value such as `../other` changes the directory. Put a `LocationPolicy` on the spec to confine where the filled path can point ([Location policy](../storage-and-transforms/index.md#location-policy)).
 
+Don't put secrets in a path template or its `params`. Error messages show the path of a location (see [Errors](../errors/index.md)), so `https://host/{token}/sales.csv` filled with a token puts the token in any error about that file. Pass credentials in an auth profile, or in a query parameter of a URL; errors never show either.
+
 ## Globs
 
 <!-- concept:31 -->

@@ -96,7 +96,7 @@ stream passed to `inspect_schema_bytes()` is read but not closed.
 
 | Field | Meaning |
 |---|---|
-| `path` | String path or URI; `{name}` placeholders use the operation's `params` |
+| `path` | String path or URI; `{name}` placeholders use the operation's `params`. Errors show the path, so keep secrets out of path segments, templates and `params`; use an auth profile or a query parameter instead |
 | `format` | Format key or `FormatSpec` instance; otherwise inferred from suffix |
 | `storage_profile`, `auth_profile` | Transport profiles; storage may also be a name |
 | `transforms` | Explicit transport `Pipeline` |

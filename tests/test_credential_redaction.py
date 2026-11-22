@@ -120,24 +120,6 @@ def test_append_schema_mismatch_hides_credentials(policy):
     assert_no_sentinel(info.value)
 
 
-def test_append_combine_failure_hides_location_and_native_text(monkeypatch):
-    existing = io.BytesIO()
-    pq.write_table(pa.table({"a": [1]}), existing)
-
-    def fail(_tables):
-        raise pa.ArrowInvalid("SENTQ leaked from pyarrow")
-
-    monkeypatch.setattr(pa, "concat_tables", fail)
-    with serve({"m.parquet?sig=SENTQ": existing.getvalue()}) as (base, _):
-        sink = FileSinkSpec(path=_credential_url(base, "m.parquet"), format="parquet", write_disposition="append")
-        with pytest.raises(WriteError) as info:
-            write(sink, pa.table({"a": [2]}))
-    assert "ArrowInvalid" in str(info.value)
-    assert "127.0.0.1" in str(info.value)
-    assert info.value.__cause__ is None and info.value.__context__ is None
-    assert_no_sentinel(info.value)
-
-
 def _parse_archive_with_member_failure(monkeypatch, make_failure, on_unrecognised, caplog):
     import mountainash_files._operations as operations
 

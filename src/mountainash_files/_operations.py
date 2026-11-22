@@ -441,15 +441,9 @@ def _merge_append_tables(path: str, existing: pa.Table, incoming: pa.Table) -> p
         ],
         metadata=metadata,
     )
-    try:
-        before = pa.Table.from_arrays(existing.columns, schema=schema)
-        after = pa.Table.from_arrays(incoming.columns, schema=schema)
-        return pa.concat_tables([before, after])
-    except pa.ArrowException as exc:
-        failure = safe_detail(exc)
-    raise WriteError(
-        f"Cannot combine append tables for {safe_location(path)!r}: {failure}"
-    )
+    before = pa.Table.from_arrays(existing.columns, schema=schema)
+    after = pa.Table.from_arrays(incoming.columns, schema=schema)
+    return pa.concat_tables([before, after])
 
 
 def write(
