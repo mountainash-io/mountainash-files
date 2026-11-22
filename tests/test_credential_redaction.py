@@ -5,10 +5,12 @@ import io
 import logging
 import traceback
 import zipfile
+from collections.abc import Iterable
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+from _range_server import serve
 from mountainash_transport.location import LocationPolicy
 
 from mountainash_files import (
@@ -24,14 +26,15 @@ from mountainash_files import (
     write,
 )
 from mountainash_files._safe_location import safe_detail
-from tests._range_server import serve
 
 SENTINELS = ("SENTU", "SENTP", "SENTQ", "SENTF")
 
 
 def _surfaces(exc: BaseException) -> list[str]:
     """Every text a caller can reach from *exc*, including hidden chain members."""
-    out, seen, stack = [], set(), [exc]
+    out: list[str] = []
+    seen: set[int] = set()
+    stack: list[BaseException | None] = [exc]
     while stack:
         current = stack.pop()
         if current is None or id(current) in seen:
@@ -43,7 +46,7 @@ def _surfaces(exc: BaseException) -> list[str]:
     return out
 
 
-def assert_no_sentinel(exc: BaseException, logs: list[str] = ()) -> None:
+def assert_no_sentinel(exc: BaseException, logs: Iterable[str] = ()) -> None:
     leaked = [t for t in [*_surfaces(exc), *logs] if any(s in t for s in SENTINELS)]
     assert not leaked, leaked
 
