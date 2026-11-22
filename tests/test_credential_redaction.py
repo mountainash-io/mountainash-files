@@ -5,10 +5,12 @@ import io
 import logging
 import traceback
 import zipfile
+from collections.abc import Iterable
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+from _range_server import serve
 from mountainash_transport.location import LocationPolicy
 
 from mountainash_files import (
@@ -24,14 +26,15 @@ from mountainash_files import (
     write,
 )
 from mountainash_files._safe_location import safe_detail
-from tests._range_server import serve
 
 SENTINELS = ("SENTU", "SENTP", "SENTQ", "SENTF")
 
 
 def _surfaces(exc: BaseException) -> list[str]:
     """Every text a caller can reach from *exc*, including hidden chain members."""
-    out, seen, stack = [], set(), [exc]
+    out: list[str] = []
+    seen: set[int] = set()
+    stack: list[BaseException | None] = [exc]
     while stack:
         current = stack.pop()
         if current is None or id(current) in seen:
@@ -43,7 +46,7 @@ def _surfaces(exc: BaseException) -> list[str]:
     return out
 
 
-def assert_no_sentinel(exc: BaseException, logs: list[str] = ()) -> None:
+def assert_no_sentinel(exc: BaseException, logs: Iterable[str] = ()) -> None:
     leaked = [t for t in [*_surfaces(exc), *logs] if any(s in t for s in SENTINELS)]
     assert not leaked, leaked
 
@@ -117,24 +120,6 @@ def test_append_schema_mismatch_hides_credentials(policy):
         )
         with pytest.raises(AppendSchemaMismatchError) as info:
             write(sink, pa.table({"b": ["x"]}))
-    assert_no_sentinel(info.value)
-
-
-def test_append_combine_failure_hides_location_and_native_text(monkeypatch):
-    existing = io.BytesIO()
-    pq.write_table(pa.table({"a": [1]}), existing)
-
-    def fail(_tables):
-        raise pa.ArrowInvalid("SENTQ leaked from pyarrow")
-
-    monkeypatch.setattr(pa, "concat_tables", fail)
-    with serve({"m.parquet?sig=SENTQ": existing.getvalue()}) as (base, _):
-        sink = FileSinkSpec(path=_credential_url(base, "m.parquet"), format="parquet", write_disposition="append")
-        with pytest.raises(WriteError) as info:
-            write(sink, pa.table({"a": [2]}))
-    assert "ArrowInvalid" in str(info.value)
-    assert "127.0.0.1" in str(info.value)
-    assert info.value.__cause__ is None and info.value.__context__ is None
     assert_no_sentinel(info.value)
 
 

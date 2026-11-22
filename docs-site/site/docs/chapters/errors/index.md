@@ -34,7 +34,7 @@ Some failures come from elsewhere and pass through unchanged:
 
 `on_missing="skip"` absorbs only `PathNotFoundError` for a missing source ([Missing files](../selecting-files/index.md#missing-files)). Every other error still raises.
 
-Files errors show only the safe parts of a location, in messages and in the `path` attributes of `UnknownFormatError` and `AppendSchemaMismatchError`. For a URL (`scheme://…` or `//…`) that is the scheme, host, port and path; user name, password, query string and fragment are left out, so `https://user:pw@host/x.dat?token=t#f` is reported as `https://host/x.dat`. Any other string that starts with a scheme (`s3:bucket/x.dat`, `user:pass@host/x.dat`) is reported as `***`. Local paths, including `C:/` drives, are shown unchanged. The `path` attribute holds this display form, not the value you passed. Text from other libraries' exceptions is shown only for operating-system errors (`[Errno 2] No such file or directory`); otherwise only the exception's type name.
+Files errors show only the safe parts of a location, in messages and in the `path` attributes of `UnknownFormatError` and `AppendSchemaMismatchError`. For a URL (`scheme://…` or `//…`) that is the scheme, host, port and path; user name, password, query string and fragment are left out, so `https://user:pw@host/x.dat?token=t#f` is reported as `https://host/x.dat`. Any other string that starts with a scheme (`s3:bucket/x.dat`, `user:pass@host/x.dat`) is reported as `***`. Local paths, including `C:/` drives, are shown unchanged. The `path` attribute holds this display form, not the value you passed. Because the path is shown, don't put secrets in path segments or path templates (see [Path templates](../selecting-files/index.md#path-templates)). Text from other libraries' exceptions is shown only for operating-system errors (`[Errno 2] No such file or directory`); otherwise only the exception's type name.
 
 ## Format errors
 
@@ -188,7 +188,7 @@ spec_cls ModuleNotFoundError
 | `Raw-byte append is not supported; supply tabular records` | `bytes`, `bytearray` or `memoryview` with `write_disposition="append"`. Supply a table or records. |
 | `Unknown write disposition: 'upsert'` | `write_disposition` must be `"replace"` or `"append"`. |
 | `Tabular append requires an Arrow table or record data` | Append input that is not a table, a record dictionary or a list of them. |
-| `Cannot normalize append input: ...`, `Cannot combine append tables for ...` | Arrow could not build or combine the append tables. |
+| `Cannot normalize append input: ...` | Arrow could not build a table from the append input. |
 | `Cannot serialise csv: ...` | A CSV or TSV value cannot be represented, for example a value equal to the `null_sequence` marker ([CSV](../format-options/index.md#csv)). |
 
 ```python
