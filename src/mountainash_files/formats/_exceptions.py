@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from mountainash_files._safe_location import safe_location
+
 
 class FormatError(Exception):
     """Base for all format detection and parsing errors."""
@@ -16,11 +18,11 @@ class UnknownFormatError(FormatError):
         failed_plugins: tuple[str, ...] = (),
         failures: dict[str, Exception] | None = None,
     ):
-        self.path = path
+        self.path = None if path is None else safe_location(path)
         self.known_suffixes = known_suffixes
         self.failed_plugins = failed_plugins
         msg = (
-            f"Cannot determine format from path={path!r}. "
+            f"Cannot determine format from path={self.path!r}. "
             f"Known suffixes: {', '.join(known_suffixes)}."
         )
         if failed_plugins:

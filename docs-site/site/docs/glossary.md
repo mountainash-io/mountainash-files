@@ -99,7 +99,7 @@ The value `parse` returns for each selected input. It holds `data`, the `format_
 <!-- glossary:path-template concepts:30 -->
 ## Path template
 
-A spec path containing `str.format` placeholders, such as `"sales/{year}.csv"`. The `params` argument of an operation fills them in. See [Path templates](chapters/selecting-files/index.md#path-templates).
+A spec path containing `str.format` placeholders, such as `"sales/{year}.csv"`. The `params` argument of an operation fills them in. Error messages show the filled path, so a template must not carry secrets. See [Path templates](chapters/selecting-files/index.md#path-templates).
 <!-- /glossary:path-template -->
 
 <!-- glossary:projection concepts:67 -->
