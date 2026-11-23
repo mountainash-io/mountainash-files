@@ -21,8 +21,10 @@ from mountainash_files import (
     UnknownFormatError,
     WriteError,
     ZipArchive,
+    copy,
     inspect_schema,
     parse,
+    stream,
     write,
 )
 from mountainash_files._safe_location import safe_detail
@@ -121,6 +123,37 @@ def test_append_schema_mismatch_hides_credentials(policy):
         with pytest.raises(AppendSchemaMismatchError) as info:
             write(sink, pa.table({"b": ["x"]}))
     assert_no_sentinel(info.value)
+
+
+def _directory_url(url: str) -> str:
+    # Kept out of the raising line: the traceback shows that line's source text.
+    return url.rsplit("/", 1)[0] + "/?sig=SENTQ#SENTF"
+
+
+PASS_THROUGH = {
+    "copy": lambda url, policy, tmp_path: copy(
+        FileSourceSpec(path=url, policy=policy), FileSinkSpec(path=str(tmp_path / "out.bin")),
+    ),
+    "stream": lambda url, policy, tmp_path: stream(FileSourceSpec(path=url, policy=policy)).__enter__(),
+    "glob": lambda url, policy, tmp_path: parse(
+        FileSourceSpec(path=_directory_url(url), glob="*.csv", policy=policy),
+    ),
+}
+
+PASS_THROUGH_POLICIES = {
+    **POLICIES,
+    "other-host": LocationPolicy(allowed_remote={"http": frozenset({"other.example"})}),
+}
+
+
+@pytest.mark.parametrize("policy", PASS_THROUGH_POLICIES.values(), ids=PASS_THROUGH_POLICIES.keys())
+@pytest.mark.parametrize("operation", PASS_THROUGH.values(), ids=PASS_THROUGH.keys())
+def test_transport_errors_through_copy_stream_glob_hide_credentials(operation, policy, tmp_path, caplog):
+    # Transport raises (missing file or policy refusal); files passes it through unchanged.
+    with serve({}) as (base, _):
+        with caplog.at_level(logging.DEBUG), pytest.raises(Exception) as info:
+            operation(_credential_url(base, "missing.csv"), policy, tmp_path)
+    assert_no_sentinel(info.value, [r.getMessage() for r in caplog.records])
 
 
 def _parse_archive_with_member_failure(monkeypatch, make_failure, on_unrecognised, caplog):
