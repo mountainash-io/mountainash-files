@@ -58,6 +58,12 @@ class TestArchiveSpecs:
         assert z.password is None
         assert z.inner is None
 
+    @pytest.mark.parametrize("nested", [False, True])
+    def test_zip_password_excluded_from_repr(self, nested):
+        archive = ZipArchive(password="ZIP_PASSWORD_SENTINEL")
+        value = FileSourceSpec(path="/data.zip", archive=archive) if nested else archive
+        assert "ZIP_PASSWORD_SENTINEL" not in repr(value)
+
     def test_zip_with_nested_gzip(self):
         z = ZipArchive(file_pattern="*.csv", inner=GzipCompression())
         assert z.file_pattern == "*.csv"

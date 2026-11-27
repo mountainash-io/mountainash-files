@@ -39,7 +39,7 @@ class ZipArchive:
 
     file_pattern: str = "*"
     sort_order: str = "name"
-    password: str | None = None
+    password: str | None = dataclasses.field(default=None, repr=False)
     inner: GzipCompression | None = None
     on_unrecognised: str = "error"
     max_decompressed_bytes: int = DEFAULT_MAX_DECOMPRESSED_BYTES

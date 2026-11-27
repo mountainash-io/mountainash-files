@@ -92,7 +92,7 @@ The rules follow from `str.format`:
 
 Templates build paths from values, so treat `params` from untrusted input like any other untrusted path: a value such as `../other` changes the directory. Put a `LocationPolicy` on the spec to confine where the filled path can point ([Location policy](../storage-and-transforms/index.md#location-policy)).
 
-Don't put secrets in a path template or its `params`. Error messages show the path of a location (see [Errors](../errors/index.md)), so `https://host/{token}/sales.csv` filled with a token puts the token in any error about that file. Pass credentials in an auth profile, or in a query parameter of a URL: files errors never show either, and mountainash-transport errors mask query-string values.
+Don't put secrets in a path template or its `params`. Error messages show the path of a location (see [Errors](../errors/index.md)), so `https://host/{token}/sales.csv` filled with a token puts the token in any error about that file. Pass credentials in an auth profile, or in a query parameter of a URL: files errors never show either, and mountainash-transport errors omit query strings and fragments entirely.
 
 ## Globs
 
@@ -211,7 +211,7 @@ With a glob, `on_missing` is not needed for an absent base: a glob that finds no
 |---|---|---|
 | `file_pattern` | `"*"` | Which members to extract ([Member selection](#member-selection)). |
 | `sort_order` | `"name"` | `"name"` sorts members by name; any other value keeps the order stored in the archive. |
-| `password` | `None` | Password for encrypted members, as a string. Objects with a `get_secret_value()` or `resolve()` method are also accepted. Python's `zipfile` handles only traditional ZIP encryption, not AES. |
+| `password` | `None` | Password for encrypted members, as a string. Excluded from the archive's repr, including when nested in a file spec. Objects with a `get_secret_value()` or `resolve()` method are also accepted. Python's `zipfile` handles only traditional ZIP encryption, not AES. |
 | `inner` | `None` | `GzipCompression()` to gunzip each member after extraction. |
 | `on_unrecognised` | `"error"` | `"skip"` skips members whose format cannot be resolved ([Unrecognised members](#unrecognised-members)). |
 | `max_decompressed_bytes` | 1 GiB | Limit on the total decompressed size of all extracted members. |
